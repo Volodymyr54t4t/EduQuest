@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="uk">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Підготовка до НМТ - Освітня Платформа</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="app">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <!-- Updated logo and title for NMT preparation -->
+                <h1 class="logo">🎓 НМТ Підготовка</h1>
+            </div>
+            <nav class="sidebar-nav">
+                <button class="nav-item active" data-section="dashboard">
+                    📊 Панель управління
+                </button>
+                <button class="nav-item" data-section="quizzes">
+                    📝 Тести НМТ
+                </button>
+                <button class="nav-item" data-section="leaderboard">
+                    🏆 Рейтинг
+                </button>
+                <button class="nav-item" data-section="statistics">
+                    📈 Статистика
+                </button>
+                <a href="./profile.html">Профіль</a>
+            </nav>
+            <div class="user-info">
+                <div class="user-avatar">👤</div>
+                <div class="user-details">
+                    <div class="user-name" id="currentUserName">Студент 1</div>
+                    <div class="user-role" id="currentUserRole">student</div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Dashboard Section -->
+            <section id="dashboard" class="content-section active">
+                <div class="section-header">
+                    <!-- Updated dashboard title for NMT context -->
+                    <h2>Панель управління НМТ</h2>
+                    <p>Ласкаво просимо до платформи підготовки до НМТ</p>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">📝</div>
+                        <div class="stat-content">
+                            <div class="stat-number" id="userTestsCompleted">0</div>
+                            <div class="stat-label">Тестів НМТ пройдено</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">⭐</div>
+                        <div class="stat-content">
+                            <div class="stat-number" id="userAverageScore">0%</div>
+                            <div class="stat-label">Середній бал НМТ</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">🎯</div>
+                        <div class="stat-content">
+                            <div class="stat-number" id="userTotalScore">0</div>
+                            <div class="stat-label">Загальний бал</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="recent-activity">
+                    <h3>Останні результати НМТ</h3>
+                    <div id="recentResults" class="results-list">
+                        <!-- Recent results will be loaded here -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Quizzes Section -->
+            <section id="quizzes" class="content-section">
+                <div class="section-header">
+                    <!-- Updated section title for NMT tests -->
+                    <h2>Тести для підготовки до НМТ</h2>
+                    <p>Оберіть тест НМТ для проходження</p>
+                </div>
+
+                <div id="quizzesList" class="quizzes-grid">
+                    <!-- Quizzes will be loaded here -->
+                </div>
+            </section>
+
+            <!-- Quiz Taking Section -->
+            <section id="quiz-taking" class="content-section">
+                <div class="quiz-container">
+                    <div class="quiz-header">
+                        <h2 id="quizTitle"></h2>
+                        <div class="quiz-progress">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progressFill"></div>
+                            </div>
+                            <span id="progressText">1 з 10</span>
+                        </div>
+                    </div>
+
+                    <div class="question-container">
+                        <h3 id="questionText"></h3>
+                        <div id="optionsContainer" class="options-container">
+                            <!-- Options will be loaded here -->
+                        </div>
+                    </div>
+
+                    <div class="quiz-controls">
+                        <button id="prevQuestion" class="btn btn-secondary" disabled>Попереднє</button>
+                        <button id="nextQuestion" class="btn btn-primary">Наступне</button>
+                        <button id="submitQuiz" class="btn btn-success" style="display: none;">Завершити тест
+                            НМТ</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Quiz Results Section -->
+            <section id="quiz-results" class="content-section">
+                <div class="results-container">
+                    <div class="results-header">
+                        <!-- Updated results title for NMT context -->
+                        <h2>Результати тесту НМТ</h2>
+                        <div class="score-display">
+                            <div class="score-circle">
+                                <span id="finalScore">0%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="results-summary">
+                        <div class="summary-item">
+                            <span class="summary-label">Правильних відповідей:</span>
+                            <span id="correctCount">0</span>
+                        </div>
+                        <div class="summary-item">
+                            <span class="summary-label">Загальна кількість питань:</span>
+                            <span id="totalCount">0</span>
+                        </div>
+                    </div>
+
+                    <div class="results-actions">
+                        <button id="backToQuizzes" class="btn btn-primary">Повернутися до тестів НМТ</button>
+                        <button id="viewDetailedResults" class="btn btn-secondary">Детальні результати</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Detailed Results Section -->
+            <section id="detailed-results" class="content-section">
+                <div class="detailed-results-container">
+                    <div class="detailed-header">
+                        <h2>Детальні результати НМТ</h2>
+                        <button id="backToResults" class="btn btn-secondary">Повернутися до результатів</button>
+                    </div>
+
+                    <div class="detailed-summary">
+                        <div class="summary-stats">
+                            <div class="stat-item">
+                                <span class="stat-value" id="detailedScore">0%</span>
+                                <span class="stat-label">Загальний бал</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-value" id="detailedCorrect">0</span>
+                                <span class="stat-label">Правильно</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-value" id="detailedIncorrect">0</span>
+                                <span class="stat-label">Неправильно</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-value" id="detailedTime">0 хв</span>
+                                <span class="stat-label">Час проходження</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="questions-review" id="questionsReview">
+                        <!-- Detailed question results will be loaded here -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Leaderboard Section -->
+            <section id="leaderboard" class="content-section">
+                <div class="section-header">
+                    <!-- Updated leaderboard title for NMT context -->
+                    <h2>Рейтинг студентів НМТ</h2>
+                    <p>Топ студентів за результатами тестів НМТ</p>
+                </div>
+
+                <div id="leaderboardList" class="leaderboard-list">
+                    <!-- Leaderboard will be loaded here -->
+                </div>
+            </section>
+
+            <!-- Statistics Section -->
+            <section id="statistics" class="content-section">
+                <div class="section-header">
+                    <!-- Updated statistics title for NMT context -->
+                    <h2>Статистика підготовки до НМТ</h2>
+                    <p>Загальна статистика використання платформи НМТ</p>
+                </div>
+
+                <div class="stats-overview">
+                    <div class="overview-card">
+                        <h3>Загальна статистика НМТ</h3>
+                        <div class="overview-stats">
+                            <div class="overview-item">
+                                <span class="overview-number" id="totalTestsCount">0</span>
+                                <span class="overview-label">Тестів НМТ пройдено</span>
+                            </div>
+                            <div class="overview-item">
+                                <span class="overview-number" id="totalUsersCount">0</span>
+                                <span class="overview-label">Активних студентів</span>
+                            </div>
+                            <div class="overview-item">
+                                <span class="overview-number" id="averageScoreAll">0%</span>
+                                <span class="overview-label">Середній бал НМТ</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="category-stats" id="categoryStats">
+                        <h3>Статистика за предметами НМТ</h3>
+                        <!-- Category stats will be loaded here -->
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>

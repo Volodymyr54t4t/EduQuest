@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="uk">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>НМТ - Профіль</title>
+    <link rel="stylesheet" href="profile.css">
+</head>
+
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="header-content">
+                <h1>НМТ Підготовка</h1>
+                <div class="header-actions">
+                    <button id="logoutBtn" class="logout-btn">Вийти</button>
+                </div>
+            </div>
+        </header>
+
+        <main class="main">
+            <div class="profile-card">
+                <div class="profile-header">
+                    <div class="avatar">
+                        <span id="avatarText">У</span>
+                    </div>
+                    <div class="profile-info">
+                        <h2 id="userEmail">user@example.com</h2>
+                        <p>Учасник НМТ підготовки</p>
+                    </div>
+                </div>
+
+                <form id="profileForm" class="profile-form">
+                    <div class="form-section">
+                        <h3>Особиста інформація</h3>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="firstName">Ім'я</label>
+                                <input type="text" id="firstName" name="firstName" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="lastName">Прізвище</label>
+                                <input type="text" id="lastName" name="lastName" required>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="birthDate">Дата народження</label>
+                                <input type="date" id="birthDate" name="birthDate" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="phone">Телефон</label>
+                                <input type="tel" id="phone" name="phone">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3>Освіта</h3>
+                        <div class="form-group">
+                            <label for="school">Навчальний заклад</label>
+                            <input type="text" id="school" name="school" required>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="grade">Клас</label>
+                                <select id="grade" name="grade" required>
+                                    <option value="">Оберіть клас</option>
+                                    <option value="9">9 клас</option>
+                                    <option value="10">10 клас</option>
+                                    <option value="11">11 клас</option>
+                                    <option value="graduate">Випускник</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="city">Місто</label>
+                                <input type="text" id="city" name="city" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3>НМТ Предмети</h3>
+                        <div class="subjects-grid">
+                            <label class="subject-checkbox">
+                                <input type="checkbox" name="subjects" value="ukrainian">
+                                <span class="checkmark"></span>
+                                Українська мова
+                            </label>
+                            <label class="subject-checkbox">
+                                <input type="checkbox" name="subjects" value="math">
+                                <span class="checkmark"></span>
+                                Математика
+                            </label>
+                            <label class="subject-checkbox">
+                                <input type="checkbox" name="subjects" value="history">
+                                <span class="checkmark"></span>
+                                Історія України
+                            </label>
+                            <label class="subject-checkbox">
+                                <input type="checkbox" name="subjects" value="english">
+                                <span class="checkmark"></span>
+                                Англійська мова
+                            </label>
+                            <label class="subject-checkbox">
+                                <input type="checkbox" name="subjects" value="biology">
+                                <span class="checkmark"></span>
+                                Біологія
+                            </label>
+                            <label class="subject-checkbox">
+                                <input type="checkbox" name="subjects" value="physics">
+                                <span class="checkmark"></span>
+                                Фізика
+                            </label>
+                            <label class="subject-checkbox">
+                                <input type="checkbox" name="subjects" value="chemistry">
+                                <span class="checkmark"></span>
+                                Хімія
+                            </label>
+                            <label class="subject-checkbox">
+                                <input type="checkbox" name="subjects" value="geography">
+                                <span class="checkmark"></span>
+                                Географія
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="save-btn">Зберегти профіль</button>
+                        <button type="button" id="testBtn" class="test-btn">Перейти до тестів</button>
+                    </div>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <div id="message" class="message"></div>
+    <script src="profile.js"></script>
+</body>
+
+</html>

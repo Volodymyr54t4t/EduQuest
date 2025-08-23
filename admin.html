@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="uk">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Адміністративна панель</title>
+    <link rel="stylesheet" href="admin.css">
+</head>
+
+<body>
+    <!-- Login Modal -->
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Вхід в адміністративну панель</h2>
+            </div>
+            <div class="modal-body">
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="password">Пароль:</label>
+                        <input type="password" id="password" name="password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Увійти</button>
+                </form>
+                <div id="loginError" class="error-message"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Panel -->
+    <div id="adminPanel" class="admin-panel" style="display: none;">
+        <!-- Header -->
+        <header class="admin-header">
+            <div class="header-content">
+                <h1>Адміністративна панель</h1>
+                <div class="header-actions">
+                    <span id="adminInfo" class="admin-info"></span>
+                    <button id="logoutBtn" class="btn btn-secondary">Вийти</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="admin-nav">
+            <button class="nav-btn active" data-section="dashboard">Дашборд</button>
+            <button class="nav-btn" data-section="users">Користувачі</button>
+            <button class="nav-btn" data-section="quizzes">Тести</button>
+            <button class="nav-btn" data-section="results">Результати</button>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="admin-main">
+            <!-- Dashboard Section -->
+            <section id="dashboard" class="admin-section active">
+                <h2>Статистика</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>Користувачі</h3>
+                        <div class="stat-number" id="statsUsers">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Тести</h3>
+                        <div class="stat-number" id="statsQuizzes">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Результати</h3>
+                        <div class="stat-number" id="statsResults">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Середній бал</h3>
+                        <div class="stat-number" id="statsAvgScore">0</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Users Section -->
+            <section id="users" class="admin-section">
+                <div class="section-header">
+                    <h2>Користувачі</h2>
+                    <button id="refreshUsers" class="btn btn-primary">Оновити</button>
+                </div>
+                <div class="table-container">
+                    <table id="usersTable" class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Email</th>
+                                <th>Ім'я</th>
+                                <th>Прізвище</th>
+                                <th>Роль</th>
+                                <th>Школа</th>
+                                <th>Клас</th>
+                                <th>Місто</th>
+                                <th>Бал</th>
+                                <th>Дії</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Quizzes Section -->
+            <section id="quizzes" class="admin-section">
+                <div class="section-header">
+                    <h2>Тести</h2>
+                    <div>
+                        <button id="createQuiz" class="btn btn-primary">Створити тест</button>
+                        <button id="refreshQuizzes" class="btn btn-secondary">Оновити</button>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table id="quizzesTable" class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Назва</th>
+                                <th>Категорія</th>
+                                <th>Складність</th>
+                                <th>Питань</th>
+                                <th>Створено</th>
+                                <th>Дії</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Results Section -->
+            <section id="results" class="admin-section">
+                <div class="section-header">
+                    <h2>Результати тестів</h2>
+                    <button id="refreshResults" class="btn btn-primary">Оновити</button>
+                </div>
+                <div class="table-container">
+                    <table id="resultsTable" class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Користувач</th>
+                                <th>Тест</th>
+                                <th>Бал</th>
+                                <th>Правильних</th>
+                                <th>Всього</th>
+                                <th>Дата</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Edit User Modal -->
+    <div id="editUserModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Редагувати користувача</h2>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="editUserForm">
+                    <input type="hidden" id="editUserId">
+                    <div class="form-group">
+                        <label for="editEmail">Email:</label>
+                        <input type="email" id="editEmail" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editFirstName">Ім'я:</label>
+                        <input type="text" id="editFirstName">
+                    </div>
+                    <div class="form-group">
+                        <label for="editLastName">Прізвище:</label>
+                        <input type="text" id="editLastName">
+                    </div>
+                    <div class="form-group">
+                        <label for="editRole">Роль:</label>
+                        <select id="editRole">
+                            <option value="student">Студент</option>
+                            <option value="admin">Адміністратор</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="editSchool">Школа:</label>
+                        <input type="text" id="editSchool">
+                    </div>
+                    <div class="form-group">
+                        <label for="editGrade">Клас:</label>
+                        <input type="text" id="editGrade">
+                    </div>
+                    <div class="form-group">
+                        <label for="editCity">Місто:</label>
+                        <input type="text" id="editCity">
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Зберегти</button>
+                        <button type="button" class="btn btn-secondary"
+                            onclick="closeEditUserModal()">Скасувати</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Quiz Modal -->
+    <div id="createQuizModal" class="modal">
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h2>Створити новий тест</h2>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="createQuizForm">
+                    <div class="form-group">
+                        <label for="quizTitle">Назва тесту:</label>
+                        <input type="text" id="quizTitle" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="quizDescription">Опис:</label>
+                        <textarea id="quizDescription" rows="3"></textarea>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="quizCategory">Категорія:</label>
+                            <input type="text" id="quizCategory" value="general">
+                        </div>
+                        <div class="form-group">
+                            <label for="quizDifficulty">Складність:</label>
+                            <select id="quizDifficulty">
+                                <option value="easy">Легка</option>
+                                <option value="medium" selected>Середня</option>
+                                <option value="hard">Важка</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="questions-section">
+                        <h3>Питання</h3>
+                        <div id="questionsContainer"></div>
+                        <button type="button" id="addQuestion" class="btn btn-secondary">Додати питання</button>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Створити тест</button>
+                        <button type="button" class="btn btn-secondary"
+                            onclick="closeCreateQuizModal()">Скасувати</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="admin.js"></script>
+</body>
+
+</html>

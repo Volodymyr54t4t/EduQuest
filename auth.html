@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="uk">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>НМТ - Авторизація</title>
+    <link rel="stylesheet" href="auth.css">
+</head>
+
+<body>
+    <div class="container">
+        <div class="auth-card">
+            <div class="auth-header">
+                <h1>НМТ Підготовка</h1>
+                <p>Система підготовки до Національного мультипредметного тесту</p>
+            </div>
+
+            <div class="auth-tabs">
+                <button class="tab-btn active" data-tab="login">Вхід</button>
+                <button class="tab-btn" data-tab="register">Реєстрація</button>
+            </div>
+
+            <!-- Login Form -->
+            <form id="loginForm" class="auth-form active">
+                <div class="form-group">
+                    <label for="loginEmail">Email</label>
+                    <input type="email" id="loginEmail" name="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">Пароль</label>
+                    <input type="password" id="loginPassword" name="password" required>
+                </div>
+                <button type="submit" class="auth-btn">Увійти</button>
+            </form>
+
+            <!-- Register Form -->
+            <form id="registerForm" class="auth-form">
+                <div class="form-group">
+                    <label for="registerEmail">Email</label>
+                    <input type="email" id="registerEmail" name="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="registerPassword">Пароль</label>
+                    <input type="password" id="registerPassword" name="password" required minlength="6">
+                </div>
+                <div class="form-group">
+                    <label for="confirmPassword">Підтвердити пароль</label>
+                    <input type="password" id="confirmPassword" name="confirmPassword" required minlength="6">
+                </div>
+                <button type="submit" class="auth-btn">Зареєструватися</button>
+            </form>
+
+            <div class="auth-footer">
+                <p>Вже маєте акаунт? <a href="#" class="switch-link" data-tab="login">Увійти</a></p>
+                <p>Немає акаунту? <a href="#" class="switch-link" data-tab="register">Зареєструватися</a></p>
+            </div>
+        </div>
+    </div>
+
+    <div id="message" class="message"></div>
+    <script src="auth.js"></script>
+</body>
+
+</html>
