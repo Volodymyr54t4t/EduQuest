@@ -378,8 +378,13 @@ body {
 }
 
 .btn:disabled {
-  opacity: 0.5;
+  opacity: 0.6;
   cursor: not-allowed;
+  transform: none;
+}
+
+.btn-success:disabled {
+  background-color: #6b7280;
 }
 
 /* Results */
@@ -429,6 +434,23 @@ body {
   display: flex;
   gap: 1rem;
   justify-content: center;
+}
+
+.performance-feedback {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.no-answer-note {
+  padding: 0.75rem 1rem;
+  margin-top: 0.75rem;
+  background-color: rgba(245, 158, 11, 0.1);
+  border: 1px solid #f59e0b;
+  border-radius: var(--radius);
+  color: #92400e;
+  font-size: 0.9rem;
+  font-style: italic;
 }
 
 /* Leaderboard */
@@ -643,6 +665,7 @@ body {
   font-weight: 700;
   color: var(--primary);
   margin-bottom: 0.5rem;
+  word-break: break-word;
 }
 
 .stat-label {
@@ -692,6 +715,8 @@ body {
   font-weight: 500;
   padding: 0.25rem 0.75rem;
   border-radius: 0.25rem;
+  min-width: 120px;
+  text-align: center;
 }
 
 .status-correct {
@@ -798,13 +823,18 @@ body {
   }
 
   .stat-value {
-    font-size: 2rem;
+    font-size: 1.5rem;
   }
 
   .question-header {
     flex-direction: column;
     gap: 0.5rem;
     align-items: flex-start;
+  }
+
+  .question-status {
+    min-width: auto;
+    align-self: flex-start;
   }
 
   .detailed-results-container {

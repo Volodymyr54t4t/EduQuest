@@ -4,8 +4,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Адміністративна панель</title>
+    <title>Адміністративна панель - НМТ Платформа</title>
     <link rel="stylesheet" href="admin.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 
 <body>
@@ -13,13 +16,14 @@
     <div id="loginModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Вхід в адміністративну панель</h2>
+                <h2>🔐 Вхід в адміністративну панель</h2>
             </div>
             <div class="modal-body">
                 <form id="loginForm">
                     <div class="form-group">
-                        <label for="password">Пароль:</label>
-                        <input type="password" id="password" name="password" required>
+                        <label for="password">Пароль адміністратора:</label>
+                        <input type="password" id="password" name="password" required placeholder="Введіть пароль"
+                            autocomplete="current-password">
                     </div>
                     <button type="submit" class="btn btn-primary">Увійти</button>
                 </form>
@@ -43,33 +47,35 @@
 
         <!-- Navigation -->
         <nav class="admin-nav">
-            <button class="nav-btn active" data-section="dashboard">Дашборд</button>
-            <button class="nav-btn" data-section="users">Користувачі</button>
-            <button class="nav-btn" data-section="quizzes">Тести</button>
-            <button class="nav-btn" data-section="results">Результати</button>
+            <button class="nav-btn active" data-section="dashboard">📊 Дашборд</button>
+            <button class="nav-btn" data-section="users">👥 Користувачі</button>
+            <button class="nav-btn" data-section="quizzes">📝 Тести</button>
+            <button class="nav-btn" data-section="results">📈 Результати</button>
         </nav>
 
         <!-- Main Content -->
         <main class="admin-main">
             <!-- Dashboard Section -->
             <section id="dashboard" class="admin-section active">
-                <h2>Статистика</h2>
+                <div class="section-header">
+                    <h2>Статистика платформи</h2>
+                </div>
                 <div class="stats-grid">
                     <div class="stat-card">
-                        <h3>Користувачі</h3>
+                        <h3>👥 Користувачі</h3>
                         <div class="stat-number" id="statsUsers">0</div>
                     </div>
                     <div class="stat-card">
-                        <h3>Тести</h3>
+                        <h3>📝 Тести</h3>
                         <div class="stat-number" id="statsQuizzes">0</div>
                     </div>
                     <div class="stat-card">
-                        <h3>Результати</h3>
+                        <h3>📊 Результати</h3>
                         <div class="stat-number" id="statsResults">0</div>
                     </div>
                     <div class="stat-card">
-                        <h3>Середній бал</h3>
-                        <div class="stat-number" id="statsAvgScore">0</div>
+                        <h3>🎯 Середній бал</h3>
+                        <div class="stat-number" id="statsAvgScore">0%</div>
                     </div>
                 </div>
             </section>
@@ -77,8 +83,10 @@
             <!-- Users Section -->
             <section id="users" class="admin-section">
                 <div class="section-header">
-                    <h2>Користувачі</h2>
-                    <button id="refreshUsers" class="btn btn-primary">Оновити</button>
+                    <h2>Управління користувачами</h2>
+                    <div>
+                        <button id="refreshUsers" class="btn btn-primary">🔄 Оновити</button>
+                    </div>
                 </div>
                 <div class="table-container">
                     <table id="usersTable" class="admin-table">
@@ -92,11 +100,18 @@
                                 <th>Школа</th>
                                 <th>Клас</th>
                                 <th>Місто</th>
-                                <th>Бал</th>
+                                <th>Загальний бал</th>
                                 <th>Дії</th>
                             </tr>
                         </thead>
-                        <tbody></tbody>
+                        <tbody>
+                            <tr>
+                                <td colspan="10"
+                                    style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                                    Завантаження користувачів...
+                                </td>
+                            </tr>
+                        </tbody>
                     </table>
                 </div>
             </section>
@@ -104,10 +119,10 @@
             <!-- Quizzes Section -->
             <section id="quizzes" class="admin-section">
                 <div class="section-header">
-                    <h2>Тести</h2>
+                    <h2>Управління тестами</h2>
                     <div>
-                        <button id="createQuiz" class="btn btn-primary">Створити тест</button>
-                        <button id="refreshQuizzes" class="btn btn-secondary">Оновити</button>
+                        <button id="createQuiz" class="btn btn-primary">➕ Створити тест</button>
+                        <button id="refreshQuizzes" class="btn btn-secondary">🔄 Оновити</button>
                     </div>
                 </div>
                 <div class="table-container">
@@ -123,7 +138,14 @@
                                 <th>Дії</th>
                             </tr>
                         </thead>
-                        <tbody></tbody>
+                        <tbody>
+                            <tr>
+                                <td colspan="7"
+                                    style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                                    Завантаження тестів...
+                                </td>
+                            </tr>
+                        </tbody>
                     </table>
                 </div>
             </section>
@@ -131,8 +153,10 @@
             <!-- Results Section -->
             <section id="results" class="admin-section">
                 <div class="section-header">
-                    <h2>Результати тестів</h2>
-                    <button id="refreshResults" class="btn btn-primary">Оновити</button>
+                    <h2>Результати тестування</h2>
+                    <div>
+                        <button id="refreshResults" class="btn btn-primary">🔄 Оновити</button>
+                    </div>
                 </div>
                 <div class="table-container">
                     <table id="resultsTable" class="admin-table">
@@ -147,7 +171,14 @@
                                 <th>Дата</th>
                             </tr>
                         </thead>
-                        <tbody></tbody>
+                        <tbody>
+                            <tr>
+                                <td colspan="7"
+                                    style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                                    Завантаження результатів...
+                                </td>
+                            </tr>
+                        </tbody>
                     </table>
                 </div>
             </section>
@@ -158,7 +189,7 @@
     <div id="editUserModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>Редагувати користувача</h2>
+                <h2>✏️ Редагувати користувача</h2>
                 <span class="close">&times;</span>
             </div>
             <div class="modal-body">
@@ -168,13 +199,15 @@
                         <label for="editEmail">Email:</label>
                         <input type="email" id="editEmail" required>
                     </div>
-                    <div class="form-group">
-                        <label for="editFirstName">Ім'я:</label>
-                        <input type="text" id="editFirstName">
-                    </div>
-                    <div class="form-group">
-                        <label for="editLastName">Прізвище:</label>
-                        <input type="text" id="editLastName">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="editFirstName">Ім'я:</label>
+                            <input type="text" id="editFirstName">
+                        </div>
+                        <div class="form-group">
+                            <label for="editLastName">Прізвище:</label>
+                            <input type="text" id="editLastName">
+                        </div>
                     </div>
                     <div class="form-group">
                         <label for="editRole">Роль:</label>
@@ -183,22 +216,24 @@
                             <option value="admin">Адміністратор</option>
                         </select>
                     </div>
-                    <div class="form-group">
-                        <label for="editSchool">Школа:</label>
-                        <input type="text" id="editSchool">
-                    </div>
-                    <div class="form-group">
-                        <label for="editGrade">Клас:</label>
-                        <input type="text" id="editGrade">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="editSchool">Школа:</label>
+                            <input type="text" id="editSchool">
+                        </div>
+                        <div class="form-group">
+                            <label for="editGrade">Клас:</label>
+                            <input type="text" id="editGrade">
+                        </div>
                     </div>
                     <div class="form-group">
                         <label for="editCity">Місто:</label>
                         <input type="text" id="editCity">
                     </div>
                     <div class="form-actions">
-                        <button type="submit" class="btn btn-primary">Зберегти</button>
-                        <button type="button" class="btn btn-secondary"
-                            onclick="closeEditUserModal()">Скасувати</button>
+                        <button type="submit" class="btn btn-primary">💾 Зберегти</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeEditUserModal()">❌
+                            Скасувати</button>
                     </div>
                 </form>
             </div>
@@ -209,23 +244,23 @@
     <div id="createQuizModal" class="modal">
         <div class="modal-content large">
             <div class="modal-header">
-                <h2>Створити новий тест</h2>
+                <h2>➕ Створити новий тест</h2>
                 <span class="close">&times;</span>
             </div>
             <div class="modal-body">
                 <form id="createQuizForm">
                     <div class="form-group">
                         <label for="quizTitle">Назва тесту:</label>
-                        <input type="text" id="quizTitle" required>
+                        <input type="text" id="quizTitle" required placeholder="Введіть назву тесту">
                     </div>
                     <div class="form-group">
                         <label for="quizDescription">Опис:</label>
-                        <textarea id="quizDescription" rows="3"></textarea>
+                        <textarea id="quizDescription" rows="3" placeholder="Короткий опис тесту"></textarea>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
                             <label for="quizCategory">Категорія:</label>
-                            <input type="text" id="quizCategory" value="general">
+                            <input type="text" id="quizCategory" value="general" placeholder="Категорія тесту">
                         </div>
                         <div class="form-group">
                             <label for="quizDifficulty">Складність:</label>
@@ -237,14 +272,14 @@
                         </div>
                     </div>
                     <div class="questions-section">
-                        <h3>Питання</h3>
+                        <h3>📝 Питання</h3>
                         <div id="questionsContainer"></div>
-                        <button type="button" id="addQuestion" class="btn btn-secondary">Додати питання</button>
+                        <button type="button" id="addQuestion" class="btn btn-secondary">➕ Додати питання</button>
                     </div>
                     <div class="form-actions">
-                        <button type="submit" class="btn btn-primary">Створити тест</button>
-                        <button type="button" class="btn btn-secondary"
-                            onclick="closeCreateQuizModal()">Скасувати</button>
+                        <button type="submit" class="btn btn-primary">✅ Створити тест</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeCreateQuizModal()">❌
+                            Скасувати</button>
                     </div>
                 </form>
             </div>

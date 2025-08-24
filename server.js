@@ -750,8 +750,7 @@ app.get("/api/admin/dashboard", requireAdmin, async (req, res) => {
     const averageScore = Math.round(avgScoreResult.rows[0].avg_score || 0);
 
     // Get recent activity
-    const recentActivity = await pool.query(`
-      SELECT 
+    const recentActivity = await pool.query(`SELECT 
         tr.id,
         tr.score,
         tr.completed_at,
@@ -762,19 +761,16 @@ app.get("/api/admin/dashboard", requireAdmin, async (req, res) => {
       JOIN users u ON tr.user_id = u.id
       JOIN quizzes q ON tr.quiz_id = q.id
       ORDER BY tr.completed_at DESC
-      LIMIT 10
-    `);
+      LIMIT 10`);
 
     // Get category stats
-    const categoryStats = await pool.query(`
-      SELECT 
+    const categoryStats = await pool.query(`SELECT 
         category,
         COUNT(*) as total_tests,
         AVG(score) as avg_score
       FROM test_results
       GROUP BY category
-      ORDER BY total_tests DESC
-    `);
+      ORDER BY total_tests DESC`);
 
     res.json({
       totalUsers,
@@ -793,6 +789,8 @@ app.get("/api/admin/dashboard", requireAdmin, async (req, res) => {
 // Admin Users Endpoint
 app.get("/api/admin/users", requireAdmin, async (req, res) => {
   try {
+    console.log("[v0] Admin users endpoint called");
+
     const result = await pool.query(`
       SELECT 
         u.id,
@@ -800,31 +798,41 @@ app.get("/api/admin/users", requireAdmin, async (req, res) => {
         u.first_name,
         u.last_name,
         u.role,
+        u.school,
+        u.grade,
+        u.city,
+        u.total_score,
         u.created_at,
         COUNT(tr.id) as tests_completed,
         COALESCE(AVG(tr.score), 0) as average_score
       FROM users u
       LEFT JOIN test_results tr ON u.id = tr.user_id
-      WHERE u.role != 'admin'
-      GROUP BY u.id, u.email, u.first_name, u.last_name, u.role, u.created_at
+      WHERE u.role != 'admin' OR u.role IS NULL
+      GROUP BY u.id, u.email, u.first_name, u.last_name, u.role, u.school, u.grade, u.city, u.total_score, u.created_at
       ORDER BY u.created_at DESC
     `);
 
     const users = result.rows.map((user) => ({
       id: user.id,
-      name:
-        `${user.first_name || ""} ${user.last_name || ""}`.trim() ||
-        "Без імені",
       email: user.email,
-      role: user.role,
+      first_name: user.first_name,
+      last_name: user.last_name,
+      name:
+        `${user.first_name || ""} ${user.last_name || ""}`.trim() || user.email,
+      role: user.role || "student",
+      school: user.school,
+      grade: user.grade,
+      city: user.city,
+      totalScore: Number.parseInt(user.total_score) || 0,
       testsCompleted: Number.parseInt(user.tests_completed),
-      averageScore: Math.round(user.average_score),
+      averageScore: Math.round(Number.parseFloat(user.average_score)),
       createdAt: user.created_at,
     }));
 
+    console.log("[v0] Returning users:", users.length);
     res.json({ users });
   } catch (error) {
-    console.error("Get users error:", error);
+    console.error("[v0] Get admin users error:", error);
     res.status(500).json({ error: "Помилка отримання користувачів" });
   }
 });
@@ -832,8 +840,7 @@ app.get("/api/admin/users", requireAdmin, async (req, res) => {
 // Admin Quizzes Endpoint
 app.get("/api/admin/quizzes", requireAdmin, async (req, res) => {
   try {
-    const result = await pool.query(`
-      SELECT 
+    const result = await pool.query(`SELECT 
         q.id,
         q.title,
         q.category,
@@ -845,8 +852,7 @@ app.get("/api/admin/quizzes", requireAdmin, async (req, res) => {
       FROM quizzes q
       LEFT JOIN test_results tr ON q.id = tr.quiz_id
       GROUP BY q.id, q.title, q.category, q.difficulty, q.created_at, q.questions
-      ORDER BY q.created_at DESC
-    `);
+      ORDER BY q.created_at DESC`);
 
     const quizzes = result.rows.map((quiz) => ({
       id: quiz.id,
@@ -869,8 +875,7 @@ app.get("/api/admin/quizzes", requireAdmin, async (req, res) => {
 // Admin Results Endpoint
 app.get("/api/admin/results", requireAdmin, async (req, res) => {
   try {
-    const result = await pool.query(`
-      SELECT 
+    const result = await pool.query(`SELECT 
         tr.id,
         tr.score,
         tr.correct_answers,
@@ -883,8 +888,7 @@ app.get("/api/admin/results", requireAdmin, async (req, res) => {
       JOIN users u ON tr.user_id = u.id
       JOIN quizzes q ON tr.quiz_id = q.id
       ORDER BY tr.completed_at DESC
-      LIMIT 100
-    `);
+      LIMIT 100`);
 
     const results = result.rows.map((result) => ({
       id: result.id,
@@ -1107,31 +1111,40 @@ app.get("/api/admin/analytics", requireAdmin, async (req, res) => {
 // Get all users with detailed information (admin only)
 app.get("/api/admin/users", requireAdmin, async (req, res) => {
   try {
-    const result =
-      await pool.query(`SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.created_at,
+    console.log("[v0] Admin users endpoint called");
+
+    const result = await pool.query(`
+      SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.school, u.grade, u.city, u.total_score, u.created_at,
              COUNT(tr.id) as tests_completed,
-             COALESCE(AVG(tr.score), 0) as average_score,
-             COALESCE(SUM(tr.score), 0) as total_score
+             COALESCE(AVG(tr.score), 0) as average_score
       FROM users u
       LEFT JOIN test_results tr ON u.id = tr.user_id
-      GROUP BY u.id, u.email, u.first_name, u.last_name, u.role, u.created_at
-      ORDER BY u.created_at DESC`);
+      WHERE u.role != 'admin' OR u.role IS NULL
+      GROUP BY u.id, u.email, u.first_name, u.last_name, u.role, u.school, u.grade, u.city, u.total_score, u.created_at
+      ORDER BY u.created_at DESC
+    `);
 
     const users = result.rows.map((user) => ({
       id: user.id,
       email: user.email,
+      first_name: user.first_name,
+      last_name: user.last_name,
       name:
         `${user.first_name || ""} ${user.last_name || ""}`.trim() || user.email,
       role: user.role || "student",
+      school: user.school,
+      grade: user.grade,
+      city: user.city,
+      totalScore: Number.parseInt(user.total_score) || 0,
       testsCompleted: Number.parseInt(user.tests_completed),
       averageScore: Math.round(Number.parseFloat(user.average_score)),
-      totalScore: Number.parseInt(user.total_score),
       createdAt: user.created_at,
     }));
 
-    res.json(users);
+    console.log("[v0] Returning users:", users.length);
+    res.json({ users });
   } catch (error) {
-    console.error("Get admin users error:", error);
+    console.error("[v0] Get admin users error:", error);
     res.status(500).json({ error: "Помилка отримання користувачів" });
   }
 });

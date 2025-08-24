@@ -112,9 +112,9 @@ async function loadDashboard() {
           (result) => `
                 <div class="result-item">
                     <div class="result-info">
-                        <h4>Тест #${result.quizId}</h4>
+                        <h4>${result.quiz_title}</h4>
                         <div class="result-date">${new Date(
-                          result.completedAt
+                          result.completed_at
                         ).toLocaleDateString("uk-UA")}</div>
                     </div>
                     <div class="result-score">${result.score}%</div>
@@ -286,14 +286,32 @@ function formatTime(milliseconds) {
 
 async function submitQuiz() {
   try {
+    const unansweredQuestions = userAnswers.filter((answer) => answer === null);
+    if (unansweredQuestions.length > 0) {
+      const confirmSubmit = confirm(
+        `У вас є ${unansweredQuestions.length} незаповнених питань. Ви впевнені, що хочете завершити тест?`
+      );
+      if (!confirmSubmit) {
+        return;
+      }
+    }
+
     const quizEndTime = new Date();
     const timeSpentMs = quizEndTime - quizStartTime;
-    const timeSpentMinutes = Math.round(timeSpentMs / 1000 / 60); // Keep for server compatibility
+    const timeSpentMinutes = Math.round(timeSpentMs / 1000 / 60);
+
+    const submitButton = document.getElementById("submitQuiz");
+    const originalText = submitButton.textContent;
+    submitButton.textContent = "Збереження результатів...";
+    submitButton.disabled = true;
 
     const response = await fetch(`/api/quizzes/${currentQuiz.id}/submit`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Authorization: `Bearer ${
+          localStorage.getItem("token") || "demo-token"
+        }`,
       },
       body: JSON.stringify({
         userId: currentUser.id,
@@ -311,11 +329,47 @@ async function submitQuiz() {
         timeSpentMs: timeSpentMs,
         questions: currentQuiz.questions,
         userAnswers: userAnswers,
+        quizTitle: currentQuiz.title,
+        quizDescription: currentQuiz.description,
+        difficulty: currentQuiz.difficulty,
+        category: currentQuiz.category,
+        completedAt: new Date().toISOString(),
+        questionAnalysis: currentQuiz.questions.map((question, index) => {
+          const userAnswer = userAnswers[index];
+          const correctAnswer = question.correct;
+          const isCorrect = userAnswer === correctAnswer;
+
+          return {
+            questionNumber: index + 1,
+            question: question.question,
+            options: question.options,
+            userAnswer:
+              userAnswer !== null
+                ? question.options[userAnswer]
+                : "Не відповів",
+            correctAnswer: question.options[correctAnswer],
+            isCorrect: isCorrect,
+            userAnswerIndex: userAnswer,
+            correctAnswerIndex: correctAnswer,
+          };
+        }),
       };
+
       showResults(result.result);
+    } else {
+      alert(
+        "Помилка при збереженні результатів: " +
+          (result.error || "Невідома помилка")
+      );
+      submitButton.textContent = originalText;
+      submitButton.disabled = false;
     }
   } catch (error) {
     console.error("Error submitting quiz:", error);
+    alert("Помилка при збереженні результатів. Спробуйте ще раз.");
+    const submitButton = document.getElementById("submitQuiz");
+    submitButton.textContent = "Завершити тест НМТ";
+    submitButton.disabled = false;
   }
 }
 
@@ -324,10 +378,55 @@ function showResults(result) {
   document.getElementById("quiz-taking").classList.remove("active");
   document.getElementById("quiz-results").classList.add("active");
 
-  // Update results
   document.getElementById("finalScore").textContent = `${result.score}%`;
   document.getElementById("correctCount").textContent = result.correctAnswers;
   document.getElementById("totalCount").textContent = result.totalQuestions;
+
+  const resultsContainer = document.querySelector(".results-summary");
+  const performanceFeedback = getPerformanceFeedback(result.score);
+
+  // Remove existing feedback if any
+  const existingFeedback = resultsContainer.querySelector(
+    ".performance-feedback"
+  );
+  if (existingFeedback) {
+    existingFeedback.remove();
+  }
+
+  // Add new feedback
+  const feedbackElement = document.createElement("div");
+  feedbackElement.className = "performance-feedback";
+  feedbackElement.innerHTML = `
+    <div class="summary-item">
+      <span class="summary-label">Оцінка результату:</span>
+      <span style="color: ${performanceFeedback.color}; font-weight: 600;">${
+    performanceFeedback.text
+  }</span>
+    </div>
+    <div class="summary-item">
+      <span class="summary-label">Час виконання:</span>
+      <span>${formatTime(detailedResults.timeSpentMs)}</span>
+    </div>
+    <div class="summary-item">
+      <span class="summary-label">Категорія тесту:</span>
+      <span>${getCategoryName(detailedResults.category)}</span>
+    </div>
+  `;
+  resultsContainer.appendChild(feedbackElement);
+}
+
+function getPerformanceFeedback(score) {
+  if (score >= 90) {
+    return { text: "Відмінно! 🎉", color: "#059669" };
+  } else if (score >= 75) {
+    return { text: "Добре! 👍", color: "#10b981" };
+  } else if (score >= 60) {
+    return { text: "Задовільно 📚", color: "#f59e0b" };
+  } else if (score >= 40) {
+    return { text: "Потребує покращення 📖", color: "#f97316" };
+  } else {
+    return { text: "Рекомендуємо повторити матеріал 📝", color: "#ef4444" };
+  }
 }
 
 function showDetailedResults() {
@@ -340,7 +439,6 @@ function showDetailedResults() {
   document.getElementById("quiz-results").classList.remove("active");
   document.getElementById("detailed-results").classList.add("active");
 
-  // Update detailed summary
   document.getElementById(
     "detailedScore"
   ).textContent = `${detailedResults.score}%`;
@@ -352,57 +450,105 @@ function showDetailedResults() {
     detailedResults.timeSpentMs
   );
 
-  // Generate detailed questions review
+  const detailedHeader = document.querySelector(".detailed-header h2");
+  detailedHeader.textContent = `Детальні результати: ${detailedResults.quizTitle}`;
+
+  const summaryStats = document.querySelector(".summary-stats");
+  summaryStats.innerHTML = `
+    <div class="stat-item">
+      <span class="stat-value">${detailedResults.score}%</span>
+      <span class="stat-label">Загальний бал</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-value">${detailedResults.correctAnswers}</span>
+      <span class="stat-label">Правильно</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-value">${
+        detailedResults.totalQuestions - detailedResults.correctAnswers
+      }</span>
+      <span class="stat-label">Неправильно</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-value">${formatTime(detailedResults.timeSpentMs)}</span>
+      <span class="stat-label">Час проходження</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-value">${getCategoryName(
+        detailedResults.category
+      )}</span>
+      <span class="stat-label">Категорія</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-value">${getDifficultyText(
+        detailedResults.difficulty
+      )}</span>
+      <span class="stat-label">Складність</span>
+    </div>
+  `;
+
   const questionsReview = document.getElementById("questionsReview");
-  questionsReview.innerHTML = detailedResults.questions
-    .map((question, index) => {
-      const userAnswer = detailedResults.userAnswers[index];
-      const correctAnswer = question.correct;
-      const isCorrect = userAnswer === correctAnswer;
+  questionsReview.innerHTML = detailedResults.questionAnalysis
+    .map((analysis, index) => {
+      const isCorrect = analysis.isCorrect;
+      const wasAnswered = analysis.userAnswerIndex !== null;
 
       return `
       <div class="question-review ${isCorrect ? "correct" : "incorrect"}">
         <div class="question-header">
-          <span class="question-number">Питання ${index + 1}</span>
+          <span class="question-number">Питання ${
+            analysis.questionNumber
+          }</span>
           <span class="question-status ${
-            isCorrect ? "status-correct" : "status-incorrect"
+            isCorrect
+              ? "status-correct"
+              : wasAnswered
+              ? "status-incorrect"
+              : "status-no-answer"
           }">
-            ${isCorrect ? "✓ Правильно" : "✗ Неправильно"}
+            ${
+              isCorrect
+                ? "✓ Правильно"
+                : wasAnswered
+                ? "✗ Неправильно"
+                : "⚠ Не відповів"
+            }
           </span>
         </div>
-        <div class="question-text">${question.question}</div>
+        <div class="question-text">${analysis.question}</div>
         <div class="answers-review">
-          ${question.options
+          ${analysis.options
             .map((option, optionIndex) => {
               let className = "answer-option";
-              if (optionIndex === correctAnswer) {
+              let label = "";
+
+              if (optionIndex === analysis.correctAnswerIndex) {
                 className += " correct-answer";
+                label = " (Правильна відповідь)";
               }
-              if (optionIndex === userAnswer && userAnswer !== correctAnswer) {
-                className += " user-wrong-answer";
-              }
-              if (optionIndex === userAnswer && userAnswer === correctAnswer) {
-                className += " user-correct-answer";
+
+              if (optionIndex === analysis.userAnswerIndex) {
+                if (analysis.isCorrect) {
+                  className += " user-correct-answer";
+                } else {
+                  className += " user-wrong-answer";
+                  label = " (Ваша відповідь)";
+                }
               }
 
               return `
               <div class="${className}">
-                ${option}
-                ${
-                  optionIndex === correctAnswer
-                    ? ' <span class="answer-label">(Правильна відповідь)</span>'
-                    : ""
-                }
-                ${
-                  optionIndex === userAnswer && userAnswer !== correctAnswer
-                    ? ' <span class="answer-label">(Ваша відповідь)</span>'
-                    : ""
-                }
+                ${option}${label}
               </div>
             `;
             })
             .join("")}
         </div>
+        ${
+          !wasAnswered
+            ? '<div class="no-answer-note">⚠ Ви не дали відповідь на це питання</div>'
+            : ""
+        }
       </div>
     `;
     })
