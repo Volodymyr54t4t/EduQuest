@@ -91,19 +91,19 @@ async function initDatabase() {
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`);
 
-    // Quizzes table
     await pool.query(`CREATE TABLE IF NOT EXISTS quizzes (
       id SERIAL PRIMARY KEY,
       title VARCHAR(255) NOT NULL,
       description TEXT,
       category VARCHAR(100) DEFAULT 'general',
       difficulty VARCHAR(20) DEFAULT 'medium',
+      time_limit INTEGER DEFAULT 60,
+      passing_score INTEGER DEFAULT 60,
       questions JSONB NOT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`);
 
-    // Test results table
     await pool.query(`CREATE TABLE IF NOT EXISTS test_results (
       id SERIAL PRIMARY KEY,
       user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -111,6 +111,7 @@ async function initDatabase() {
       score INTEGER NOT NULL,
       correct_answers INTEGER NOT NULL,
       total_questions INTEGER NOT NULL,
+      time_spent INTEGER DEFAULT 0,
       results JSONB NOT NULL,
       category VARCHAR(100),
       completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -454,11 +455,85 @@ app.get("/api/quizzes/:id", async (req, res) => {
   }
 });
 
-// Submit quiz results
+app.post("/api/admin/quizzes", requireAdmin, async (req, res) => {
+  try {
+    const {
+      title,
+      description,
+      category,
+      difficulty,
+      timeLimit,
+      passingScore,
+      questions,
+    } = req.body;
+
+    if (!title || !description || !questions || questions.length === 0) {
+      return res.status(400).json({ error: "Відсутні обов'язкові поля" });
+    }
+
+    const processedQuestions = questions.map((q, index) => {
+      const questionData = {
+        id: index + 1,
+        question: q.question,
+        type: q.type || "single",
+        image: q.image || null,
+      };
+
+      switch (q.type) {
+        case "single":
+        case "single-image":
+          questionData.options = q.options;
+          questionData.correct = q.correct;
+          break;
+        case "multiple":
+        case "multiple-image":
+          questionData.options = q.options;
+          questionData.correct = Array.isArray(q.correct)
+            ? q.correct
+            : [q.correct];
+          break;
+        case "text-input":
+          questionData.correctAnswer = Array.isArray(q.correctAnswer)
+            ? q.correctAnswer
+            : [q.correctAnswer];
+          break;
+        case "true-false":
+          questionData.correct = q.correct;
+          break;
+        default:
+          questionData.options = q.options;
+          questionData.correct = q.correct;
+      }
+
+      return questionData;
+    });
+
+    const result = await pool.query(
+      `INSERT INTO quizzes (title, description, category, difficulty, time_limit, passing_score, questions)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING *`,
+      [
+        title,
+        description,
+        category || "general",
+        difficulty || "medium",
+        timeLimit || 60,
+        passingScore || 60,
+        JSON.stringify(processedQuestions),
+      ]
+    );
+
+    res.json({ success: true, quiz: result.rows[0] });
+  } catch (error) {
+    console.error("Create quiz error:", error);
+    res.status(500).json({ error: "Помилка створення тесту" });
+  }
+});
+
 app.post("/api/quizzes/:id/submit", authenticateToken, async (req, res) => {
   try {
     const quizId = Number.parseInt(req.params.id);
-    const { answers } = req.body;
+    const { answers, timeSpent } = req.body;
     const userId = req.user.userId;
 
     // Get quiz
@@ -472,54 +547,84 @@ app.post("/api/quizzes/:id/submit", authenticateToken, async (req, res) => {
     const quiz = quizResult.rows[0];
     const questions = quiz.questions;
 
-    // Calculate score
     let correctAnswers = 0;
     const results = questions.map((question, index) => {
-      const isCorrect = answers[index] === question.correct;
+      let isCorrect = false;
+      const userAnswer = answers[index];
+
+      switch (question.type) {
+        case "single":
+        case "single-image":
+          isCorrect = userAnswer === question.correct;
+          break;
+        case "multiple":
+        case "multiple-image":
+          const correctSet = new Set(question.correct);
+          const userSet = new Set(
+            Array.isArray(userAnswer) ? userAnswer : [userAnswer]
+          );
+          isCorrect =
+            correctSet.size === userSet.size &&
+            [...correctSet].every((x) => userSet.has(x));
+          break;
+        case "text-input":
+          const correctAnswers = question.correctAnswer.map((ans) =>
+            ans.toLowerCase().trim()
+          );
+          const userText = (userAnswer || "").toLowerCase().trim();
+          isCorrect = correctAnswers.includes(userText);
+          break;
+        case "true-false":
+          isCorrect = userAnswer === question.correct;
+          break;
+        default:
+          isCorrect = userAnswer === question.correct;
+      }
+
       if (isCorrect) correctAnswers++;
 
       return {
         questionId: question.id,
         question: question.question,
-        userAnswer: answers[index],
-        correctAnswer: question.correct,
+        type: question.type,
+        userAnswer: userAnswer,
+        correctAnswer: question.correct || question.correctAnswer,
         isCorrect,
       };
     });
 
     const score = Math.round((correctAnswers / questions.length) * 100);
+    const passed = score >= (quiz.passing_score || 60);
 
     // Save result
     await pool.query(
-      `INSERT INTO test_results (user_id, quiz_id, score, correct_answers, total_questions, results, category)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      `INSERT INTO test_results (user_id, quiz_id, score, correct_answers, total_questions, time_spent, results, category)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [
         userId,
         quizId,
         score,
         correctAnswers,
         questions.length,
+        timeSpent || 0,
         JSON.stringify(results),
         quiz.category,
       ]
     );
 
-    // Update user total score
     await pool.query(
-      `UPDATE users SET total_score = (
-        SELECT COALESCE(SUM(score), 0) FROM test_results WHERE user_id = $1
-      ) WHERE id = $1`,
-      [userId]
+      "UPDATE users SET total_score = total_score + $1 WHERE id = $2",
+      [score, userId]
     );
 
     res.json({
       success: true,
-      result: {
-        score,
-        correctAnswers,
-        totalQuestions: questions.length,
-        percentage: score,
-      },
+      score,
+      correctAnswers,
+      totalQuestions: questions.length,
+      passed,
+      passingScore: quiz.passing_score || 60,
+      results,
     });
   } catch (error) {
     console.error("Submit quiz error:", error);
@@ -905,42 +1010,6 @@ app.get("/api/admin/results", requireAdmin, async (req, res) => {
   } catch (error) {
     console.error("Get results error:", error);
     res.status(500).json({ error: "Помилка отримання результатів" });
-  }
-});
-
-// Create new quiz
-app.post("/api/admin/quizzes", requireAdmin, async (req, res) => {
-  try {
-    const { title, description, category, difficulty, questions } = req.body;
-
-    if (!title || !description || !questions || questions.length === 0) {
-      return res.status(400).json({ error: "Відсутні обов'язкові поля" });
-    }
-
-    const questionsWithIds = questions.map((q, index) => ({
-      id: index + 1,
-      question: q.question,
-      options: q.options,
-      correct: q.correct,
-    }));
-
-    const result = await pool.query(
-      `INSERT INTO quizzes (title, description, category, difficulty, questions)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING *`,
-      [
-        title,
-        description,
-        category || "general",
-        difficulty || "medium",
-        JSON.stringify(questionsWithIds),
-      ]
-    );
-
-    res.json({ success: true, quiz: result.rows[0] });
-  } catch (error) {
-    console.error("Create quiz error:", error);
-    res.status(500).json({ error: "Помилка створення тесту" });
   }
 });
 

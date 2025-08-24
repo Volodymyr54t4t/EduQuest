@@ -2,6 +2,7 @@ class AdminPanel {
   constructor() {
     this.token = localStorage.getItem("adminToken");
     this.currentSection = "dashboard";
+    this.questionCounter = 0; // Added question counter for unique IDs
     this.init();
   }
 
@@ -53,7 +54,8 @@ class AdminPanel {
 
     // Add question button
     document.getElementById("addQuestion").addEventListener("click", () => {
-      this.addQuestion();
+      const questionType = document.getElementById("questionType").value;
+      this.addQuestion(questionType);
     });
 
     // Modal close buttons
@@ -293,12 +295,11 @@ class AdminPanel {
               </button>
               <button class="btn btn-danger" onclick="adminPanel.deleteUser(${
                 user.id
-              })" 
-                      ${
-                        user.role === "admin"
-                          ? 'disabled title="Неможливо видалити адміністратора"'
-                          : ""
-                      }>
+              })" ${
+            user.role === "admin"
+              ? 'disabled title="Неможливо видалити адміністратора"'
+              : ""
+          }>
                 Видалити
               </button>
             </td>
@@ -597,45 +598,214 @@ class AdminPanel {
   showCreateQuizModal() {
     document.getElementById("createQuizModal").style.display = "flex";
     document.getElementById("questionsContainer").innerHTML = "";
-    this.addQuestion(); // Add first question
+    this.questionCounter = 0; // Reset counter
+    this.addQuestion("single"); // Add first question with default type
   }
 
-  addQuestion() {
+  addQuestion(type = "single") {
     const container = document.getElementById("questionsContainer");
-    const questionNumber = container.children.length + 1;
+    this.questionCounter++;
+    const questionNumber = this.questionCounter;
 
     const questionDiv = document.createElement("div");
     questionDiv.className = "question-item";
-    questionDiv.innerHTML = `
+    questionDiv.dataset.questionId = questionNumber;
+    questionDiv.dataset.questionType = type;
+
+    let questionHTML = `
       <div class="question-header">
-        <span class="question-number">Питання ${questionNumber}</span>
+        <div>
+          <span class="question-number">Питання ${questionNumber}</span>
+          <span class="question-type-badge">${this.getQuestionTypeName(
+            type
+          )}</span>
+        </div>
         <button type="button" class="remove-question" onclick="this.parentElement.parentElement.remove(); adminPanel.updateQuestionNumbers();">×</button>
       </div>
       <div class="form-group">
         <label>Текст питання:</label>
-        <input type="text" class="question-text" required>
-      </div>
-      <div class="options-container">
-        <div class="option-group">
-          <input type="radio" name="correct_${questionNumber}" value="0" required>
-          <input type="text" class="option-text" placeholder="Варіант 1" required>
-        </div>
-        <div class="option-group">
-          <input type="radio" name="correct_${questionNumber}" value="1">
-          <input type="text" class="option-text" placeholder="Варіант 2" required>
-        </div>
-        <div class="option-group">
-          <input type="radio" name="correct_${questionNumber}" value="2">
-          <input type="text" class="option-text" placeholder="Варіант 3" required>
-        </div>
-        <div class="option-group">
-          <input type="radio" name="correct_${questionNumber}" value="3">
-          <input type="text" class="option-text" placeholder="Варіант 4" required>
-        </div>
+        <textarea class="question-text" required rows="2" placeholder="Введіть текст питання..."></textarea>
       </div>
     `;
 
+    if (type.includes("image")) {
+      questionHTML += `
+        <div class="image-upload-section">
+          <input type="file" class="image-upload-input" accept="image/*" onchange="adminPanel.handleImageUpload(this, ${questionNumber})">
+          <button type="button" class="image-upload-button" onclick="this.previousElementSibling.click()">
+            📷 Додати зображення
+          </button>
+          <div class="image-preview" style="display: none;">
+            <img src="/placeholder.svg" alt="Question image" onclick="adminPanel.previewImage(this.src)">
+            <button type="button" class="image-remove" onclick="adminPanel.removeImage(${questionNumber})">×</button>
+          </div>
+        </div>
+      `;
+    }
+
+    switch (type) {
+      case "single":
+      case "single-image":
+        questionHTML += this.createSingleChoiceOptions(questionNumber);
+        break;
+      case "multiple":
+      case "multiple-image":
+        questionHTML += this.createMultipleChoiceOptions(questionNumber);
+        break;
+      case "text-input":
+        questionHTML += this.createTextInputOptions(questionNumber);
+        break;
+      case "true-false":
+        questionHTML += this.createTrueFalseOptions(questionNumber);
+        break;
+    }
+
+    questionDiv.innerHTML = questionHTML;
     container.appendChild(questionDiv);
+  }
+
+  createSingleChoiceOptions(questionNumber) {
+    return `
+      <div class="options-container">
+        ${[0, 1, 2, 3]
+          .map(
+            (index) => `
+          <div class="option-group">
+            <div class="option-letter">${String.fromCharCode(65 + index)}</div>
+            <input type="radio" name="correct_${questionNumber}" value="${index}" required>
+            <input type="text" class="option-text" placeholder="Варіант ${
+              index + 1
+            }" required>
+          </div>
+        `
+          )
+          .join("")}
+      </div>
+    `;
+  }
+
+  createMultipleChoiceOptions(questionNumber) {
+    return `
+      <div class="options-container">
+        <div class="form-group">
+          <label style="font-size: 0.875rem; color: var(--text-secondary);">
+            ✓ Оберіть всі правильні варіанти:
+          </label>
+        </div>
+        ${[0, 1, 2, 3]
+          .map(
+            (index) => `
+          <div class="option-group">
+            <div class="option-letter">${String.fromCharCode(65 + index)}</div>
+            <input type="checkbox" name="correct_${questionNumber}" value="${index}">
+            <input type="text" class="option-text" placeholder="Варіант ${
+              index + 1
+            }" required>
+          </div>
+        `
+          )
+          .join("")}
+      </div>
+    `;
+  }
+
+  createTextInputOptions(questionNumber) {
+    return `
+      <div class="form-group">
+        <label>Правильна відповідь:</label>
+        <input type="text" class="text-answer-input" placeholder="Введіть правильну відповідь..." required>
+        <div class="text-answer-keywords">
+          <small>Підказка: Можна вказати кілька варіантів через кому (наприклад: "Київ, київ, КИЇВ")</small>
+        </div>
+      </div>
+    `;
+  }
+
+  createTrueFalseOptions(questionNumber) {
+    return `
+      <div class="true-false-options">
+        <div class="true-false-option" onclick="adminPanel.selectTrueFalse(this, ${questionNumber}, true)">
+          <input type="radio" name="correct_${questionNumber}" value="true" required>
+          ✅ Правда
+        </div>
+        <div class="true-false-option" onclick="adminPanel.selectTrueFalse(this, ${questionNumber}, false)">
+          <input type="radio" name="correct_${questionNumber}" value="false">
+          ❌ Неправда
+        </div>
+      </div>
+    `;
+  }
+
+  getQuestionTypeName(type) {
+    const types = {
+      single: "Одна відповідь",
+      multiple: "Декілька відповідей",
+      "single-image": "З фото (одна)",
+      "multiple-image": "З фото (декілька)",
+      "text-input": "Текстова",
+      "true-false": "Правда/Неправда",
+    };
+    return types[type] || "Невідомий тип";
+  }
+
+  handleImageUpload(input, questionNumber) {
+    const file = input.files[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      // 5MB limit
+      this.showNotification(
+        "Розмір файлу не повинен перевищувати 5MB",
+        "error"
+      );
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const questionDiv = document.querySelector(
+        `[data-question-id="${questionNumber}"]`
+      );
+      const imageSection = questionDiv.querySelector(".image-upload-section");
+      const preview = imageSection.querySelector(".image-preview");
+      const img = preview.querySelector("img");
+
+      img.src = e.target.result;
+      preview.style.display = "block";
+      imageSection.classList.add("has-image");
+
+      // Store image data
+      questionDiv.dataset.imageData = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  removeImage(questionNumber) {
+    const questionDiv = document.querySelector(
+      `[data-question-id="${questionNumber}"]`
+    );
+    const imageSection = questionDiv.querySelector(".image-upload-section");
+    const preview = imageSection.querySelector(".image-preview");
+    const input = imageSection.querySelector(".image-upload-input");
+
+    preview.style.display = "none";
+    imageSection.classList.remove("has-image");
+    input.value = "";
+    delete questionDiv.dataset.imageData;
+  }
+
+  previewImage(src) {
+    document.getElementById("previewImage").src = src;
+    document.getElementById("imagePreviewModal").style.display = "flex";
+  }
+
+  selectTrueFalse(element, questionNumber, value) {
+    const container = element.parentElement;
+    container.querySelectorAll(".true-false-option").forEach((opt) => {
+      opt.classList.remove("selected");
+    });
+    element.classList.add("selected");
+    element.querySelector('input[type="radio"]').checked = true;
   }
 
   updateQuestionNumbers() {
@@ -645,11 +815,22 @@ class AdminPanel {
       question.querySelector(
         ".question-number"
       ).textContent = `Питання ${questionNumber}`;
+      question.dataset.questionId = questionNumber;
 
-      // Update radio button names
+      // Update radio button names for single choice
       const radios = question.querySelectorAll('input[type="radio"]');
       radios.forEach((radio) => {
-        radio.name = `correct_${questionNumber}`;
+        if (radio.name.startsWith("correct_")) {
+          radio.name = `correct_${questionNumber}`;
+        }
+      });
+
+      // Update checkbox names for multiple choice
+      const checkboxes = question.querySelectorAll('input[type="checkbox"]');
+      checkboxes.forEach((checkbox) => {
+        if (checkbox.name.startsWith("correct_")) {
+          checkbox.name = `correct_${questionNumber}`;
+        }
       });
     });
   }
@@ -659,32 +840,115 @@ class AdminPanel {
     const description = document.getElementById("quizDescription").value;
     const category = document.getElementById("quizCategory").value;
     const difficulty = document.getElementById("quizDifficulty").value;
+    const timeLimit = document.getElementById("quizTimeLimit").value;
+    const passingScore = document.getElementById("quizPassingScore").value;
 
     const questions = [];
     const questionItems = document.querySelectorAll(".question-item");
 
     for (let i = 0; i < questionItems.length; i++) {
       const item = questionItems[i];
+      const questionType = item.dataset.questionType;
       const questionText = item.querySelector(".question-text").value;
-      const options = Array.from(item.querySelectorAll(".option-text")).map(
-        (input) => input.value
-      );
-      const correctRadio = item.querySelector('input[type="radio"]:checked');
+      const imageData = item.dataset.imageData || null;
 
-      if (!questionText || options.some((opt) => !opt) || !correctRadio) {
+      if (!questionText.trim()) {
         this.showNotification(
-          `Будь ласка, заповніть всі поля для питання ${i + 1}`,
+          `Будь ласка, введіть текст для питання ${i + 1}`,
           "error"
         );
         return;
       }
 
-      questions.push({
+      const questionData = {
         id: i + 1,
         question: questionText,
-        options: options,
-        correct: Number.parseInt(correctRadio.value),
-      });
+        type: questionType,
+        image: imageData,
+      };
+
+      switch (questionType) {
+        case "single":
+        case "single-image":
+          const singleOptions = Array.from(
+            item.querySelectorAll(".option-text")
+          ).map((input) => input.value);
+          const singleCorrectRadio = item.querySelector(
+            'input[type="radio"]:checked'
+          );
+
+          if (singleOptions.some((opt) => !opt.trim()) || !singleCorrectRadio) {
+            this.showNotification(
+              `Будь ласка, заповніть всі поля для питання ${i + 1}`,
+              "error"
+            );
+            return;
+          }
+
+          questionData.options = singleOptions;
+          questionData.correct = Number.parseInt(singleCorrectRadio.value);
+          break;
+
+        case "multiple":
+        case "multiple-image":
+          const multipleOptions = Array.from(
+            item.querySelectorAll(".option-text")
+          ).map((input) => input.value);
+          const multipleCorrectCheckboxes = Array.from(
+            item.querySelectorAll('input[type="checkbox"]:checked')
+          );
+
+          if (
+            multipleOptions.some((opt) => !opt.trim()) ||
+            multipleCorrectCheckboxes.length === 0
+          ) {
+            this.showNotification(
+              `Будь ласка, заповніть всі поля та оберіть правильні відповіді для питання ${
+                i + 1
+              }`,
+              "error"
+            );
+            return;
+          }
+
+          questionData.options = multipleOptions;
+          questionData.correct = multipleCorrectCheckboxes.map((cb) =>
+            Number.parseInt(cb.value)
+          );
+          break;
+
+        case "text-input":
+          const textAnswer = item.querySelector(".text-answer-input").value;
+          if (!textAnswer.trim()) {
+            this.showNotification(
+              `Будь ласка, введіть правильну відповідь для питання ${i + 1}`,
+              "error"
+            );
+            return;
+          }
+
+          questionData.correctAnswer = textAnswer
+            .split(",")
+            .map((ans) => ans.trim());
+          break;
+
+        case "true-false":
+          const trueFalseRadio = item.querySelector(
+            'input[type="radio"]:checked'
+          );
+          if (!trueFalseRadio) {
+            this.showNotification(
+              `Будь ласка, оберіть правильну відповідь для питання ${i + 1}`,
+              "error"
+            );
+            return;
+          }
+
+          questionData.correct = trueFalseRadio.value === "true";
+          break;
+      }
+
+      questions.push(questionData);
     }
 
     if (questions.length === 0) {
@@ -693,6 +957,13 @@ class AdminPanel {
     }
 
     try {
+      const form = document.getElementById("createQuizForm");
+      form.classList.add("creating-quiz");
+
+      const submitBtn = form.querySelector('button[type="submit"]');
+      const originalText = submitBtn.textContent;
+      submitBtn.textContent = "⏳ Створення тесту...";
+
       const response = await this.apiRequest("/api/admin/quizzes", {
         method: "POST",
         body: JSON.stringify({
@@ -700,6 +971,8 @@ class AdminPanel {
           description,
           category,
           difficulty,
+          timeLimit: Number.parseInt(timeLimit),
+          passingScore: Number.parseInt(passingScore),
           questions,
         }),
       });
@@ -707,18 +980,29 @@ class AdminPanel {
       if (response && response.ok) {
         document.getElementById("createQuizModal").style.display = "none";
         this.loadQuizzes();
-        this.loadDashboard(); // Refresh stats
-        this.showNotification("Тест створено успішно", "success");
+        this.loadDashboard();
+        this.showNotification("Тест створено успішно! 🎉", "success");
 
         // Reset form
         document.getElementById("createQuizForm").reset();
         document.getElementById("questionsContainer").innerHTML = "";
+        this.questionCounter = 0;
       } else {
-        this.showNotification("Помилка створення тесту", "error");
+        const errorData = await response.json();
+        this.showNotification(
+          errorData.error || "Помилка створення тесту",
+          "error"
+        );
       }
     } catch (error) {
       console.error("Error creating quiz:", error);
       this.showNotification("Помилка створення тесту", "error");
+    } finally {
+      const form = document.getElementById("createQuizForm");
+      form.classList.remove("creating-quiz");
+
+      const submitBtn = form.querySelector('button[type="submit"]');
+      submitBtn.textContent = "✅ Створити тест";
     }
   }
 

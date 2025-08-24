@@ -260,7 +260,18 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label for="quizCategory">Категорія:</label>
-                            <input type="text" id="quizCategory" value="general" placeholder="Категорія тесту">
+                            <select id="quizCategory">
+                                <option value="mathematics">Математика</option>
+                                <option value="ukrainian">Українська мова</option>
+                                <option value="history">Історія України</option>
+                                <option value="biology">Біологія</option>
+                                <option value="chemistry">Хімія</option>
+                                <option value="physics">Фізика</option>
+                                <option value="geography">Географія</option>
+                                <option value="english">Англійська мова</option>
+                                <option value="literature">Українська література</option>
+                                <option value="general" selected>Загальні знання</option>
+                            </select>
                         </div>
                         <div class="form-group">
                             <label for="quizDifficulty">Складність:</label>
@@ -268,13 +279,37 @@
                                 <option value="easy">Легка</option>
                                 <option value="medium" selected>Середня</option>
                                 <option value="hard">Важка</option>
+                                <option value="expert">Експертна</option>
                             </select>
                         </div>
                     </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="quizTimeLimit">Час на тест (хвилини):</label>
+                            <input type="number" id="quizTimeLimit" min="5" max="180" value="60" placeholder="60">
+                        </div>
+                        <div class="form-group">
+                            <label for="quizPassingScore">Прохідний бал (%):</label>
+                            <input type="number" id="quizPassingScore" min="0" max="100" value="60" placeholder="60">
+                        </div>
+                    </div>
                     <div class="questions-section">
-                        <h3>📝 Питання</h3>
+                        <div class="questions-header">
+                            <h3>📝 Питання</h3>
+                            <div class="question-controls">
+                                <select id="questionType" class="question-type-selector">
+                                    <option value="single">Одна правильна відповідь</option>
+                                    <option value="multiple">Декілька правильних відповідей</option>
+                                    <option value="single-image">З фотографією (одна відповідь)</option>
+                                    <option value="multiple-image">З фотографією (декілька відповідей)</option>
+                                    <option value="text-input">Текстова відповідь</option>
+                                    <option value="true-false">Правда/Неправда</option>
+                                </select>
+                                <button type="button" id="addQuestion" class="btn btn-secondary">➕ Додати
+                                    питання</button>
+                            </div>
+                        </div>
                         <div id="questionsContainer"></div>
-                        <button type="button" id="addQuestion" class="btn btn-secondary">➕ Додати питання</button>
                     </div>
                     <div class="form-actions">
                         <button type="submit" class="btn btn-primary">✅ Створити тест</button>
@@ -282,6 +317,19 @@
                             Скасувати</button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Preview Modal -->
+    <div id="imagePreviewModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🖼️ Перегляд зображення</h2>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <img id="previewImage" src="/placeholder.svg" alt="Preview" style="max-width: 100%; height: auto;">
             </div>
         </div>
     </div>
