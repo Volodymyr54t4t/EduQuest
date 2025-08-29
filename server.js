@@ -871,21 +871,87 @@ app.get("/api/users/:id/stats", authenticateToken, async (req, res) => {
   }
 });
 
+// Get leaderboard
+app.get("/api/debug/users", async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        id, 
+        email, 
+        first_name, 
+        last_name, 
+        role,
+        total_score,
+        tests_completed,
+        average_score,
+        created_at
+      FROM users 
+      ORDER BY created_at DESC
+    `);
+
+    res.json({
+      total_users: result.rows.length,
+      users: result.rows,
+    });
+  } catch (error) {
+    console.error("Debug users error:", error);
+    res.status(500).json({ error: "Помилка отримання користувачів" });
+  }
+});
+
 app.get("/api/leaderboard", async (req, res) => {
   try {
-    const result = await pool.query(
-      `SELECT 
-        COALESCE(first_name || ' ' || last_name, email) as name,
-        email,
-        tests_completed,
-        ROUND(average_score) as averageScore
-       FROM users 
-       WHERE tests_completed > 0 
-       ORDER BY average_score DESC, tests_completed DESC 
-       LIMIT 10`
-    );
+    const result = await pool.query(`
+      SELECT 
+        u.id,
+        CASE 
+          WHEN u.first_name IS NOT NULL AND u.last_name IS NOT NULL AND TRIM(u.first_name) != '' AND TRIM(u.last_name) != '' 
+          THEN CONCAT(TRIM(u.first_name), ' ', TRIM(u.last_name))
+          WHEN u.first_name IS NOT NULL AND TRIM(u.first_name) != '' 
+          THEN TRIM(u.first_name)
+          ELSE SPLIT_PART(u.email, '@', 1)
+        END as name,
+        u.email,
+        COALESCE(u.total_score, 0) as total_score,
+        COALESCE(u.tests_completed, 0) as tests_completed,
+        COALESCE(u.average_score, 0) as average_score,
+        COALESCE(AVG(tr.score), 0) as calculated_average_score
+      FROM users u
+      LEFT JOIN test_results tr ON u.id = tr.user_id
+      WHERE (u.role = 'student' OR u.role IS NULL)
+      GROUP BY u.id, u.first_name, u.last_name, u.email, u.total_score, u.tests_completed, u.average_score
+      ORDER BY 
+        CASE WHEN COALESCE(u.tests_completed, 0) = 0 THEN 1 ELSE 0 END,
+        COALESCE(u.average_score, COALESCE(AVG(tr.score), 0)) DESC, 
+        COALESCE(u.total_score, 0) DESC,
+        COALESCE(u.tests_completed, 0) DESC
+      LIMIT 50
+    `);
 
-    res.json(result.rows);
+    console.log(`[v0] Leaderboard query returned ${result.rows.length} users`);
+
+    const leaderboard = result.rows.map((row, index) => {
+      const user = {
+        id: row.id,
+        name: row.name || "Невідомий користувач",
+        email: row.email,
+        totalScore: Number.parseInt(row.total_score) || 0,
+        testsCompleted: Number.parseInt(row.tests_completed) || 0,
+        averageScore: Math.round(
+          Number.parseFloat(row.average_score) ||
+            Number.parseFloat(row.calculated_average_score) ||
+            0
+        ),
+        rank: index + 1,
+      };
+
+      console.log(
+        `[v0] User ${user.rank}: ${user.name} (${user.email}) - ${user.testsCompleted} tests, ${user.averageScore}% avg`
+      );
+      return user;
+    });
+
+    res.json(leaderboard);
   } catch (error) {
     console.error("Get leaderboard error:", error);
     res.status(500).json({ error: "Помилка отримання рейтингу" });
@@ -1021,37 +1087,9 @@ app.get("/api/users/:id/stats", async (req, res) => {
 });
 
 // Get leaderboard
-app.get("/api/leaderboard", async (req, res) => {
-  try {
-    const result = await pool.query(`SELECT 
-      u.id,
-      COALESCE(CONCAT(u.first_name, ' ', u.last_name), u.email) as name,
-      COALESCE(u.total_score, 0) as total_score,
-      COUNT(tr.id) as tests_completed,
-      COALESCE(AVG(tr.score), 0) as average_score
-      FROM users u
-      LEFT JOIN test_results tr ON u.id = tr.user_id
-      WHERE u.role = 'student' OR u.role IS NULL
-      GROUP BY u.id, u.first_name, u.last_name, u.email, u.total_score
-      ORDER BY average_score DESC, total_score DESC
-      LIMIT 20`);
 
-    const leaderboard = result.rows.map((row) => ({
-      id: row.id,
-      name: row.name,
-      totalScore: Number.parseInt(row.total_score),
-      testsCompleted: Number.parseInt(row.tests_completed),
-      averageScore: Math.round(Number.parseFloat(row.average_score)),
-    }));
+// The duplicate endpoint around line 760 has been removed
 
-    res.json(leaderboard);
-  } catch (error) {
-    console.error("Get leaderboard error:", error);
-    res.status(500).json({ error: "Помилка отримання рейтингу" });
-  }
-});
-
-// Get all users
 app.get("/api/users", async (req, res) => {
   try {
     const result =
