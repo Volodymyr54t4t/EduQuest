@@ -162,6 +162,9 @@ async function initDatabase() {
       );
 
       await pool.query(
+        `ALTER TABLE test_results ADD COLUMN IF NOT EXISTS time_spent INTEGER DEFAULT 0`
+      );
+      await pool.query(
         `ALTER TABLE test_results ADD COLUMN IF NOT EXISTS difficulty VARCHAR(20)`
       );
       await pool.query(
@@ -613,104 +616,323 @@ app.post("/api/admin/quizzes", requireAdmin, async (req, res) => {
 });
 
 app.post("/api/quizzes/:id/submit", authenticateToken, async (req, res) => {
+  const client = await pool.connect();
+
   try {
+    await client.query("BEGIN");
+
     const quizId = Number.parseInt(req.params.id);
     const { answers, timeSpent } = req.body;
     const userId = req.user.userId;
 
-    // Get quiz
-    const quizResult = await pool.query("SELECT * FROM quizzes WHERE id = $1", [
-      quizId,
-    ]);
+    // Input validation
+    if (!Array.isArray(answers)) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        success: false,
+        error: "Невірний формат відповідей",
+      });
+    }
+
+    if (timeSpent && (typeof timeSpent !== "number" || timeSpent < 0)) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        success: false,
+        error: "Невірний формат часу виконання",
+      });
+    }
+
+    // Get quiz data
+    const quizResult = await client.query(
+      "SELECT * FROM quizzes WHERE id = $1",
+      [quizId]
+    );
     if (quizResult.rows.length === 0) {
-      return res.status(404).json({ error: "Тест не знайдено" });
+      await client.query("ROLLBACK");
+      return res.status(404).json({
+        success: false,
+        error: "Тест не знайдено",
+      });
     }
 
     const quiz = quizResult.rows[0];
     const questions = quiz.questions;
 
+    // Validate answers array length
+    if (answers.length !== questions.length) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        success: false,
+        error: "Кількість відповідей не відповідає кількості питань",
+      });
+    }
+
+    // Calculate score
     let correctAnswers = 0;
-    const results = questions.map((question, index) => {
-      let isCorrect = false;
+    const totalQuestions = questions.length;
+
+    questions.forEach((question, index) => {
       const userAnswer = answers[index];
-
-      switch (question.type) {
-        case "single":
-        case "single-image":
-          isCorrect = userAnswer === question.correct;
-          break;
-        case "multiple":
-        case "multiple-image":
-          const correctSet = new Set(question.correct);
-          const userSet = new Set(
-            Array.isArray(userAnswer) ? userAnswer : [userAnswer]
-          );
-          isCorrect =
-            correctSet.size === userSet.size &&
-            [...correctSet].every((x) => userSet.has(x));
-          break;
-        case "text-input":
-          const correctAnswers = question.correctAnswer.map((ans) =>
-            ans.toLowerCase().trim()
-          );
-          const userText = (userAnswer || "").toLowerCase().trim();
-          isCorrect = correctAnswers.includes(userText);
-          break;
-        case "true-false":
-          isCorrect = userAnswer === question.correct;
-          break;
-        default:
-          isCorrect = userAnswer === question.correct;
+      if (userAnswer !== null && userAnswer === question.correct) {
+        correctAnswers++;
       }
-
-      if (isCorrect) correctAnswers++;
-
-      return {
-        questionId: question.id,
-        question: question.question,
-        type: question.type,
-        userAnswer: userAnswer,
-        correctAnswer: question.correct || question.correctAnswer,
-        isCorrect,
-      };
     });
 
-    const score = Math.round((correctAnswers / questions.length) * 100);
-    const passed = score >= (quiz.passing_score || 60);
+    const score = Math.round((correctAnswers / totalQuestions) * 100);
 
-    // Save result
-    await pool.query(
-      `INSERT INTO test_results (user_id, quiz_id, score, correct_answers, total_questions, time_spent, results, category)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    // Save result to database
+    const resultData = {
+      userAnswers: answers,
+      questions: questions,
+      correctAnswers: correctAnswers,
+      totalQuestions: totalQuestions,
+      score: score,
+      timeSpent: timeSpent || 0,
+    };
+
+    const insertResult = await client.query(
+      `INSERT INTO test_results (user_id, quiz_id, score, correct_answers, total_questions, time_spent, results, category, difficulty, ip_address, user_agent)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
       [
         userId,
         quizId,
         score,
         correctAnswers,
-        questions.length,
+        totalQuestions,
         timeSpent || 0,
-        JSON.stringify(results),
+        JSON.stringify(resultData),
         quiz.category,
+        quiz.difficulty,
+        req.ip,
+        req.get("User-Agent"),
       ]
     );
 
-    await pool.query(
-      "UPDATE users SET total_score = total_score + $1 WHERE id = $2",
+    if (insertResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.status(500).json({
+        success: false,
+        error: "Помилка збереження результату тесту",
+      });
+    }
+
+    // Update user statistics with correct calculation
+    const userUpdateResult = await client.query(
+      `UPDATE users SET 
+       tests_completed = tests_completed + 1,
+       total_score = total_score + $1
+       WHERE id = $2 RETURNING tests_completed, total_score`,
       [score, userId]
     );
 
+    if (userUpdateResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.status(500).json({
+        success: false,
+        error: "Помилка оновлення статистики користувача",
+      });
+    }
+
+    // Calculate and update average score separately
+    const { tests_completed, total_score } = userUpdateResult.rows[0];
+    const newAverageScore =
+      Math.round((total_score / tests_completed) * 100) / 100;
+
+    await client.query(`UPDATE users SET average_score = $1 WHERE id = $2`, [
+      newAverageScore,
+      userId,
+    ]);
+
+    // Update quiz statistics
+    const quizUpdateResult = await client.query(
+      `UPDATE quizzes SET 
+       times_taken = times_taken + 1,
+       average_score = (
+         SELECT ROUND(AVG(score)::numeric, 2) FROM test_results WHERE quiz_id = $1
+       )
+       WHERE id = $1 RETURNING times_taken`,
+      [quizId]
+    );
+
+    if (quizUpdateResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+      return res.status(500).json({
+        success: false,
+        error: "Помилка оновлення статистики тесту",
+      });
+    }
+
+    await client.query("COMMIT");
+
     res.json({
       success: true,
-      score,
-      correctAnswers,
-      totalQuestions: questions.length,
-      passed,
-      passingScore: quiz.passing_score || 60,
-      results,
+      result: {
+        score: score,
+        correctAnswers: correctAnswers,
+        totalQuestions: totalQuestions,
+        timeSpent: timeSpent || 0,
+        resultId: insertResult.rows[0].id,
+      },
     });
   } catch (error) {
+    await client.query("ROLLBACK");
     console.error("Submit quiz error:", error);
-    res.status(500).json({ error: "Помилка збереження результатів" });
+
+    // Provide more specific error messages
+    let errorMessage = "Помилка збереження результатів";
+
+    if (error.code === "23503") {
+      errorMessage = "Помилка: користувач або тест не існує";
+    } else if (error.code === "23505") {
+      errorMessage = "Помилка: дублікат запису";
+    } else if (error.code === "22P02") {
+      errorMessage = "Помилка: невірний формат даних";
+    } else if (error.message.includes("connection")) {
+      errorMessage = "Помилка з'єднання з базою даних";
+    }
+
+    res.status(500).json({
+      success: false,
+      error: errorMessage,
+    });
+  } finally {
+    client.release();
+  }
+});
+
+app.get("/api/users/:id", authenticateToken, async (req, res) => {
+  try {
+    const userId = Number.parseInt(req.params.id);
+
+    // Verify user can access this data
+    if (req.user.userId !== userId) {
+      return res.status(403).json({ message: "Доступ заборонено" });
+    }
+
+    const result = await pool.query(
+      "SELECT id, email, first_name, last_name, role, tests_completed, average_score, total_score FROM users WHERE id = $1",
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: "Користувач не знайдений" });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error("Get user error:", error);
+    res.status(500).json({ message: "Помилка сервера" });
+  }
+});
+
+app.get("/api/users/:id/stats", authenticateToken, async (req, res) => {
+  try {
+    const userId = Number.parseInt(req.params.id);
+
+    // Verify user can access this data
+    if (req.user.userId !== userId) {
+      return res.status(403).json({ message: "Доступ заборонено" });
+    }
+
+    // Get user stats
+    const userResult = await pool.query(
+      "SELECT tests_completed, average_score, total_score FROM users WHERE id = $1",
+      [userId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ message: "Користувач не знайдений" });
+    }
+
+    const userStats = userResult.rows[0];
+
+    // Get recent results
+    const recentResults = await pool.query(
+      `SELECT tr.score, tr.completed_at, q.title as quiz_title
+       FROM test_results tr
+       JOIN quizzes q ON tr.quiz_id = q.id
+       WHERE tr.user_id = $1
+       ORDER BY tr.completed_at DESC
+       LIMIT 5`,
+      [userId]
+    );
+
+    res.json({
+      stats: {
+        testsCompleted: userStats.tests_completed || 0,
+        averageScore: Math.round(userStats.average_score || 0),
+        totalScore: userStats.total_score || 0,
+      },
+      recentResults: recentResults.rows,
+    });
+  } catch (error) {
+    console.error("Get user stats error:", error);
+    res.status(500).json({ message: "Помилка сервера" });
+  }
+});
+
+app.get("/api/leaderboard", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT 
+        COALESCE(first_name || ' ' || last_name, email) as name,
+        email,
+        tests_completed,
+        ROUND(average_score) as averageScore
+       FROM users 
+       WHERE tests_completed > 0 
+       ORDER BY average_score DESC, tests_completed DESC 
+       LIMIT 10`
+    );
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Get leaderboard error:", error);
+    res.status(500).json({ error: "Помилка отримання рейтингу" });
+  }
+});
+
+app.get("/api/stats/overview", async (req, res) => {
+  try {
+    // Get total counts
+    const totalTests = await pool.query("SELECT COUNT(*) FROM test_results");
+    const totalUsers = await pool.query(
+      "SELECT COUNT(*) FROM users WHERE tests_completed > 0"
+    );
+    const averageScore = await pool.query(
+      "SELECT AVG(score) FROM test_results"
+    );
+
+    // Get category stats
+    const categoryStats = await pool.query(
+      `SELECT 
+        category,
+        COUNT(*) as count,
+        ROUND(AVG(score)) as averageScore
+       FROM test_results 
+       WHERE category IS NOT NULL
+       GROUP BY category`
+    );
+
+    const categoryStatsObj = {};
+    categoryStats.rows.forEach((row) => {
+      categoryStatsObj[row.category] = {
+        count: Number.parseInt(row.count),
+        averageScore: Number.parseInt(row.averagescore),
+      };
+    });
+
+    res.json({
+      totalTests: Number.parseInt(totalTests.rows[0].count),
+      totalUsers: Number.parseInt(totalUsers.rows[0].count),
+      averageScore: Math.round(
+        Number.parseFloat(averageScore.rows[0].avg) || 0
+      ),
+      categoryStats: categoryStatsObj,
+    });
+  } catch (error) {
+    console.error("Get stats overview error:", error);
+    res.status(500).json({ error: "Помилка отримання статистики" });
   }
 });
 

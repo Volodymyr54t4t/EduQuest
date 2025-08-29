@@ -1,95 +1,285 @@
 // Global variables
-const currentUser = { id: 1, name: "Студент 1", role: "student" };
+let currentUser = null;
 let currentQuiz = null;
 let currentQuestionIndex = 0;
 let userAnswers = [];
 let quizzes = [];
 let quizStartTime = null;
 let detailedResults = null;
+let isAuthenticating = false;
+let authRetryCount = 0;
+const MAX_AUTH_RETRIES = 3;
+const authCheckTimeout = null;
+let lastAuthCheck = 0;
+const AUTH_CHECK_COOLDOWN = 5000; // 5 seconds cooldown between auth checks
 
 // Initialize app
 document.addEventListener("DOMContentLoaded", () => {
-  initializeApp();
-  setupEventListeners();
-  loadDashboard();
+  if (!isAuthenticating) {
+    checkAuthentication();
+  }
 });
+
+async function checkAuthentication() {
+  const now = Date.now();
+  if (isAuthenticating || now - lastAuthCheck < AUTH_CHECK_COOLDOWN) {
+    return;
+  }
+
+  isAuthenticating = true;
+  lastAuthCheck = now;
+  const token = localStorage.getItem("token");
+  const userId = localStorage.getItem("userId");
+
+  if (!token || !userId) {
+    if (
+      !window.location.pathname.includes("auth.html") &&
+      !window.location.pathname.includes("index.html")
+    ) {
+      isAuthenticating = false;
+      setTimeout(() => {
+        if (!window.location.pathname.includes("auth.html")) {
+          window.location.href = "/auth.html";
+        }
+      }, 1000);
+    } else {
+      isAuthenticating = false;
+    }
+    return;
+  }
+
+  try {
+    // Verify token and get user info
+    const response = await fetch(`/api/users/${userId}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (response.ok) {
+      const userData = await response.json();
+      currentUser = userData;
+      authRetryCount = 0; // Reset retry count on success
+      isAuthenticating = false;
+      initializeApp();
+    } else if (response.status === 401 || response.status === 403) {
+      console.warn("Authentication failed, cleaning up tokens");
+      localStorage.removeItem("token");
+      localStorage.removeItem("userId");
+      isAuthenticating = false;
+
+      if (!window.location.pathname.includes("auth.html")) {
+        setTimeout(() => {
+          if (!window.location.pathname.includes("auth.html")) {
+            window.location.href = "/auth.html";
+          }
+        }, 2000);
+      }
+    } else {
+      authRetryCount++;
+      if (authRetryCount >= MAX_AUTH_RETRIES) {
+        console.error(
+          "Max authentication retries reached, redirecting to login"
+        );
+        localStorage.removeItem("token");
+        localStorage.removeItem("userId");
+        isAuthenticating = false;
+
+        if (!window.location.pathname.includes("auth.html")) {
+          setTimeout(() => {
+            window.location.href = "/auth.html";
+          }, 3000);
+        }
+      } else {
+        const retryDelay = Math.min(
+          2000 * Math.pow(2, authRetryCount - 1),
+          10000
+        );
+        setTimeout(() => {
+          isAuthenticating = false;
+          checkAuthentication();
+        }, retryDelay);
+      }
+    }
+  } catch (error) {
+    console.error("Authentication error:", error);
+
+    if (error.name === "TypeError" && error.message.includes("fetch")) {
+      // Network error - retry without clearing tokens
+      authRetryCount++;
+      if (authRetryCount >= MAX_AUTH_RETRIES) {
+        console.error(
+          "Network connectivity issues, please check your connection"
+        );
+        isAuthenticating = false;
+        return;
+      } else {
+        const retryDelay = Math.min(3000 * authRetryCount, 15000);
+        setTimeout(() => {
+          isAuthenticating = false;
+          checkAuthentication();
+        }, retryDelay);
+      }
+    } else {
+      // Other errors - treat as auth failure
+      authRetryCount++;
+      if (authRetryCount >= MAX_AUTH_RETRIES) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("userId");
+        isAuthenticating = false;
+
+        if (!window.location.pathname.includes("auth.html")) {
+          setTimeout(() => {
+            window.location.href = "/auth.html";
+          }, 3000);
+        }
+      } else {
+        setTimeout(() => {
+          isAuthenticating = false;
+          checkAuthentication();
+        }, 2000 * authRetryCount);
+      }
+    }
+  }
+}
 
 function initializeApp() {
   // Update user info in sidebar
-  document.getElementById("currentUserName").textContent = currentUser.name;
-  document.getElementById("currentUserRole").textContent = currentUser.role;
+  document.getElementById("currentUserName").textContent = currentUser.email;
+  document.getElementById("currentUserRole").textContent =
+    currentUser.role || "student";
 
-  // Load initial data
-  loadQuizzes();
+  setupEventListeners();
+  loadDashboard();
 }
 
 function setupEventListeners() {
   // Navigation
   document.querySelectorAll(".nav-item").forEach((item) => {
-    item.addEventListener("click", function () {
+    item.addEventListener("click", function (e) {
+      e.preventDefault();
       const section = this.dataset.section;
       navigateToSection(section);
     });
   });
 
   // Quiz controls
-  document
-    .getElementById("prevQuestion")
-    .addEventListener("click", previousQuestion);
-  document
-    .getElementById("nextQuestion")
-    .addEventListener("click", nextQuestion);
-  document.getElementById("submitQuiz").addEventListener("click", submitQuiz);
+  document.getElementById("prevQuestion").addEventListener("click", (e) => {
+    e.preventDefault();
+    previousQuestion();
+  });
+  document.getElementById("nextQuestion").addEventListener("click", (e) => {
+    e.preventDefault();
+    nextQuestion();
+  });
+  document.getElementById("submitQuiz").addEventListener("click", (e) => {
+    e.preventDefault();
+    submitQuiz();
+  });
 
   // Results actions
-  document
-    .getElementById("backToQuizzes")
-    .addEventListener("click", () => navigateToSection("quizzes"));
+  document.getElementById("backToQuizzes").addEventListener("click", (e) => {
+    e.preventDefault();
+    navigateToSection("quizzes");
+  });
   document
     .getElementById("viewDetailedResults")
-    .addEventListener("click", showDetailedResults);
-  document.getElementById("backToResults").addEventListener("click", () => {
+    .addEventListener("click", (e) => {
+      e.preventDefault();
+      showDetailedResults();
+    });
+  document.getElementById("backToResults").addEventListener("click", (e) => {
+    e.preventDefault();
     document.getElementById("detailed-results").classList.remove("active");
     document.getElementById("quiz-results").classList.add("active");
   });
+
+  // Logout button
+  document.getElementById("logoutBtn").addEventListener("click", (e) => {
+    e.preventDefault();
+    logout();
+  });
 }
 
-function navigateToSection(sectionName) {
-  // Update navigation
-  document.querySelectorAll(".nav-item").forEach((item) => {
-    item.classList.remove("active");
-  });
-  document
-    .querySelector(`[data-section="${sectionName}"]`)
-    .classList.add("active");
-
-  // Show section
-  document.querySelectorAll(".content-section").forEach((section) => {
-    section.classList.remove("active");
-  });
-  document.getElementById(sectionName).classList.add("active");
-
-  // Load section data
-  switch (sectionName) {
-    case "dashboard":
-      loadDashboard();
-      break;
-    case "quizzes":
-      loadQuizzes();
-      break;
-    case "leaderboard":
-      loadLeaderboard();
-      break;
-    case "statistics":
-      loadStatistics();
-      break;
+function logout() {
+  if (confirm("Ви впевнені, що хочете вийти?")) {
+    localStorage.removeItem("token");
+    localStorage.removeItem("userId");
+    setTimeout(() => {
+      window.location.href = "/auth.html";
+    }, 500);
   }
+}
+
+let navigationTimeout = null;
+function navigateToSection(sectionName) {
+  if (navigationTimeout) {
+    clearTimeout(navigationTimeout);
+  }
+
+  navigationTimeout = setTimeout(() => {
+    // Update navigation
+    document.querySelectorAll(".nav-item").forEach((item) => {
+      item.classList.remove("active");
+    });
+    const targetNav = document.querySelector(`[data-section="${sectionName}"]`);
+    if (targetNav) {
+      targetNav.classList.add("active");
+    }
+
+    // Show section
+    document.querySelectorAll(".content-section").forEach((section) => {
+      section.classList.remove("active");
+    });
+    const targetSection = document.getElementById(sectionName);
+    if (targetSection) {
+      targetSection.classList.add("active");
+    }
+
+    // Load section data
+    switch (sectionName) {
+      case "dashboard":
+        loadDashboard();
+        break;
+      case "quizzes":
+        loadQuizzes();
+        break;
+      case "leaderboard":
+        loadLeaderboard();
+        break;
+      case "statistics":
+        loadStatistics();
+        break;
+    }
+  }, 100); // Small delay to prevent rapid successive calls
 }
 
 // Dashboard functions
 async function loadDashboard() {
   try {
-    const response = await fetch(`/api/users/${currentUser.id}/stats`);
+    const token = localStorage.getItem("token");
+    const response = await fetch(`/api/users/${currentUser.id}/stats`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      console.warn("Authentication expired during dashboard load");
+
+      const refreshResult = await tryRefreshAuth();
+      if (!refreshResult) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("userId");
+
+        alert("Ваша сесія закінчилася. Будь ласка, увійдіть знову.");
+        setTimeout(() => {
+          window.location.href = "/auth.html";
+        }, 2000);
+      }
+      return;
+    }
+
     const data = await response.json();
 
     // Update dashboard stats
@@ -105,7 +295,7 @@ async function loadDashboard() {
     const recentResultsContainer = document.getElementById("recentResults");
     if (data.recentResults.length === 0) {
       recentResultsContainer.innerHTML =
-        '<p style="text-align: center; color: var(--muted-foreground); padding: 2rem;">Ще немає результатів тестів</p>';
+        '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">Ще немає результатів тестів</p>';
     } else {
       recentResultsContainer.innerHTML = data.recentResults
         .map(
@@ -125,6 +315,39 @@ async function loadDashboard() {
     }
   } catch (error) {
     console.error("Error loading dashboard:", error);
+    const recentResultsContainer = document.getElementById("recentResults");
+    if (recentResultsContainer) {
+      recentResultsContainer.innerHTML =
+        '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">Помилка завантаження даних</p>';
+    }
+  }
+}
+
+async function tryRefreshAuth() {
+  try {
+    const token = localStorage.getItem("token");
+    const userId = localStorage.getItem("userId");
+
+    if (!token || !userId) {
+      return false;
+    }
+
+    const response = await fetch(`/api/users/${userId}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (response.ok) {
+      const userData = await response.json();
+      currentUser = userData;
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    console.error("Auth refresh failed:", error);
+    return false;
   }
 }
 
@@ -305,20 +528,92 @@ async function submitQuiz() {
     submitButton.textContent = "Збереження результатів...";
     submitButton.disabled = true;
 
+    const token = localStorage.getItem("token");
     const response = await fetch(`/api/quizzes/${currentQuiz.id}/submit`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${
-          localStorage.getItem("token") || "demo-token"
-        }`,
+        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
-        userId: currentUser.id,
         answers: userAnswers,
         timeSpent: timeSpentMinutes,
       }),
     });
+
+    if (response.status === 401 || response.status === 403) {
+      console.warn("Session expired during quiz submission");
+
+      const refreshResult = await tryRefreshAuth();
+      if (refreshResult) {
+        const retryResponse = await fetch(
+          `/api/quizzes/${currentQuiz.id}/submit`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+            },
+            body: JSON.stringify({
+              answers: userAnswers,
+              timeSpent: timeSpentMinutes,
+            }),
+          }
+        );
+
+        if (retryResponse.ok) {
+          const result = await retryResponse.json();
+          if (result.success) {
+            // Process successful submission
+            detailedResults = {
+              ...result.result,
+              timeSpent: timeSpentMinutes,
+              timeSpentMs: timeSpentMs,
+              questions: currentQuiz.questions,
+              userAnswers: userAnswers,
+              quizTitle: currentQuiz.title,
+              quizDescription: currentQuiz.description,
+              difficulty: currentQuiz.difficulty,
+              category: currentQuiz.category,
+              completedAt: new Date().toISOString(),
+              questionAnalysis: currentQuiz.questions.map((question, index) => {
+                const userAnswer = userAnswers[index];
+                const correctAnswer = question.correct;
+                const isCorrect = userAnswer === correctAnswer;
+
+                return {
+                  questionNumber: index + 1,
+                  question: question.question,
+                  options: question.options,
+                  userAnswer:
+                    userAnswer !== null
+                      ? question.options[userAnswer]
+                      : "Не відповів",
+                  correctAnswer: question.options[correctAnswer],
+                  isCorrect: isCorrect,
+                  userAnswerIndex: userAnswer,
+                  correctAnswerIndex: correctAnswer,
+                };
+              }),
+            };
+
+            showResults(result.result);
+            return;
+          }
+        }
+      }
+
+      alert(
+        "Ваша сесія закінчилася під час збереження результатів. Будь ласка, увійдіть знову."
+      );
+      localStorage.removeItem("token");
+      localStorage.removeItem("userId");
+
+      setTimeout(() => {
+        window.location.href = "/auth.html";
+      }, 3000);
+      return;
+    }
 
     const result = await response.json();
 
@@ -366,7 +661,7 @@ async function submitQuiz() {
     }
   } catch (error) {
     console.error("Error submitting quiz:", error);
-    alert("Помилка при збереженні результатів. Спробуйте ще раз.");
+    alert("Помилка при збереженні результатів: " + error.message);
     const submitButton = document.getElementById("submitQuiz");
     submitButton.textContent = "Завершити тест НМТ";
     submitButton.disabled = false;
@@ -568,7 +863,9 @@ async function loadLeaderboard() {
             <div class="leaderboard-item">
                 <div class="leaderboard-rank">${index + 1}</div>
                 <div class="leaderboard-info">
-                    <div class="leaderboard-name">${user.name}</div>
+                    <div class="leaderboard-name">${
+                      user.name || user.email
+                    }</div>
                     <div class="leaderboard-stats">${
                       user.testsCompleted
                     } тестів пройдено</div>
@@ -615,7 +912,7 @@ async function loadStatistics() {
             <h3>Статистика за категоріями</h3>
             ${
               categoryStatsHTML ||
-              '<p style="text-align: center; color: var(--muted-foreground); padding: 1rem;">Немає даних</p>'
+              '<p style="text-align: center; color: var(--text-secondary); padding: 1rem;">Немає даних</p>'
             }
         `;
   } catch (error) {
