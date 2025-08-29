@@ -2,7 +2,7 @@ class AdminPanel {
   constructor() {
     this.token = localStorage.getItem("adminToken");
     this.currentSection = "dashboard";
-    this.questionCounter = 0; // Added question counter for unique IDs
+    this.questionCounter = 0;
     this.init();
   }
 
@@ -117,7 +117,6 @@ class AdminPanel {
         this.loadDashboard();
         errorDiv.style.display = "none";
 
-        // Show admin info
         if (data.user) {
           document.getElementById(
             "adminInfo"
@@ -219,12 +218,14 @@ class AdminPanel {
       const response = await this.apiRequest("/api/admin/dashboard");
       if (!response || !response.ok) {
         console.error("[v0] Dashboard API response failed");
+        this.showDashboardError();
         return;
       }
 
       const stats = await response.json();
       console.log("[v0] Dashboard stats received:", stats);
 
+      // Update basic stats
       document.getElementById("statsUsers").textContent = stats.totalUsers || 0;
       document.getElementById("statsQuizzes").textContent =
         stats.totalQuizzes || 0;
@@ -232,13 +233,123 @@ class AdminPanel {
         stats.totalResults || 0;
       document.getElementById("statsAvgScore").textContent =
         (stats.averageScore || 0) + "%";
+
+      // Update additional stats if elements exist
+      const activeUsersEl = document.getElementById("statsActiveUsers");
+      if (activeUsersEl) {
+        activeUsersEl.textContent = stats.activeUsers || 0;
+      }
+
+      const todayResultsEl = document.getElementById("statsTodayResults");
+      if (todayResultsEl) {
+        todayResultsEl.textContent = stats.todayResults || 0;
+      }
+
+      // Load top performers
+      this.loadTopPerformers(stats.topPerformers || []);
+
+      // Load category statistics
+      this.loadCategoryStats(stats.categoryStats || []);
+
+      // Load recent activity
+      this.loadRecentActivity(stats.recentActivity || []);
     } catch (error) {
       console.error("Error loading dashboard:", error);
-      document.getElementById("statsUsers").textContent = "0";
-      document.getElementById("statsQuizzes").textContent = "0";
-      document.getElementById("statsResults").textContent = "0";
-      document.getElementById("statsAvgScore").textContent = "0%";
+      this.showDashboardError();
     }
+  }
+
+  showDashboardError() {
+    document.getElementById("statsUsers").textContent = "Помилка";
+    document.getElementById("statsQuizzes").textContent = "Помилка";
+    document.getElementById("statsResults").textContent = "Помилка";
+    document.getElementById("statsAvgScore").textContent = "Помилка";
+  }
+
+  loadTopPerformers(performers) {
+    const container = document.getElementById("topPerformersContainer");
+    if (!container) return;
+
+    if (performers.length === 0) {
+      container.innerHTML = "<p>Немає даних для відображення</p>";
+      return;
+    }
+
+    container.innerHTML = performers
+      .map(
+        (performer, index) => `
+      <div class="performer-item">
+        <span class="rank">${index + 1}</span>
+        <span class="name">${performer.first_name || ""} ${
+          performer.last_name || ""
+        }</span>
+        <span class="score">${Math.round(performer.avg_score)}%</span>
+        <span class="tests">${performer.tests_taken} тестів</span>
+      </div>
+    `
+      )
+      .join("");
+  }
+
+  loadCategoryStats(categories) {
+    const container = document.getElementById("categoryStatsContainer");
+    if (!container) return;
+
+    if (categories.length === 0) {
+      container.innerHTML = "<p>Немає даних для відображення</p>";
+      return;
+    }
+
+    container.innerHTML = categories
+      .map(
+        (category) => `
+      <div class="category-stat">
+        <h4>${this.getCategoryName(category.category)}</h4>
+        <div class="stat-row">
+          <span>Тестів пройдено:</span>
+          <span>${category.total_tests}</span>
+        </div>
+        <div class="stat-row">
+          <span>Середній бал:</span>
+          <span>${Math.round(category.avg_score)}%</span>
+        </div>
+        <div class="stat-row">
+          <span>Унікальних користувачів:</span>
+          <span>${category.unique_users}</span>
+        </div>
+      </div>
+    `
+      )
+      .join("");
+  }
+
+  loadRecentActivity(activities) {
+    const container = document.getElementById("recentActivityContainer");
+    if (!container) return;
+
+    if (activities.length === 0) {
+      container.innerHTML = "<p>Немає останньої активності</p>";
+      return;
+    }
+
+    container.innerHTML = activities
+      .map(
+        (activity) => `
+      <div class="activity-item">
+        <div class="activity-user">${activity.first_name || ""} ${
+          activity.last_name || ""
+        }</div>
+        <div class="activity-quiz">${activity.quiz_title}</div>
+        <div class="activity-score ${this.getScoreBadgeClass(
+          activity.score
+        )}">${activity.score}%</div>
+        <div class="activity-time">${new Date(
+          activity.completed_at
+        ).toLocaleString("uk-UA")}</div>
+      </div>
+    `
+      )
+      .join("");
   }
 
   async loadUsers() {
@@ -246,8 +357,20 @@ class AdminPanel {
       console.log("[v0] Loading users");
 
       const response = await this.apiRequest("/api/admin/users");
-      if (!response || !response.ok) {
-        console.error("[v0] Users API response failed");
+      if (!response) {
+        console.error("[v0] No response from users API");
+        this.showUsersError("Помилка з'єднання з сервером");
+        return;
+      }
+
+      if (!response.ok) {
+        console.error(
+          "[v0] Users API response failed with status:",
+          response.status
+        );
+        const errorText = await response.text();
+        console.error("[v0] Error response:", errorText);
+        this.showUsersError("Помилка завантаження користувачів");
         return;
       }
 
@@ -260,7 +383,7 @@ class AdminPanel {
       if (users.length === 0) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="10" style="text-align: center; padding: 40px; color: var(--text-secondary);">
+            <td colspan="11" style="text-align: center; padding: 40px; color: var(--text-secondary);">
               Користувачі не знайдені
             </td>
           </tr>
@@ -271,53 +394,58 @@ class AdminPanel {
       tbody.innerHTML = users
         .map(
           (user) => `
-          <tr>
-            <td>${user.id}</td>
-            <td>${user.email}</td>
-            <td>${user.first_name || "-"}</td>
-            <td>${user.last_name || "-"}</td>
-            <td>
-              <span class="badge ${
-                user.role === "admin" ? "badge-danger" : "badge-primary"
-              }">
-                ${user.role === "admin" ? "Адмін" : "Студент"}
-              </span>
-            </td>
-            <td>${user.school || "-"}</td>
-            <td>${user.grade || "-"}</td>
-            <td>${user.city || "-"}</td>
-            <td>${user.totalScore || user.total_score || 0}</td>
-            <td class="actions">
-              <button class="btn btn-success" onclick="adminPanel.editUser(${
-                user.id
-              })">
-                Редагувати
-              </button>
-              <button class="btn btn-danger" onclick="adminPanel.deleteUser(${
-                user.id
-              })" ${
+        <tr>
+          <td>${user.id}</td>
+          <td>${user.email}</td>
+          <td>${user.first_name || "-"}</td>
+          <td>${user.last_name || "-"}</td>
+          <td>
+            <span class="badge ${
+              user.role === "admin" ? "badge-danger" : "badge-primary"
+            }">
+              ${user.role === "admin" ? "Адмін" : "Студент"}
+            </span>
+          </td>
+          <td>${user.school || "-"}</td>
+          <td>${user.grade || "-"}</td>
+          <td>${user.city || "-"}</td>
+          <td>${user.totalScore || 0}</td>
+          <td>${user.testsCompleted || 0}</td>
+          <td class="actions">
+            <button class="btn btn-success" onclick="adminPanel.editUser(${
+              user.id
+            })">
+              Редагувати
+            </button>
+            <button class="btn btn-danger" onclick="adminPanel.deleteUser(${
+              user.id
+            })" ${
             user.role === "admin"
               ? 'disabled title="Неможливо видалити адміністратора"'
               : ""
           }>
-                Видалити
-              </button>
-            </td>
-          </tr>
-        `
+              Видалити
+            </button>
+          </td>
+        </tr>
+      `
         )
         .join("");
     } catch (error) {
       console.error("Error loading users:", error);
-      const tbody = document.querySelector("#usersTable tbody");
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="10" style="text-align: center; padding: 40px; color: var(--danger-color);">
-            Помилка завантаження користувачів
-          </td>
-        </tr>
-      `;
+      this.showUsersError("Помилка завантаження користувачів");
     }
+  }
+
+  showUsersError(message) {
+    const tbody = document.querySelector("#usersTable tbody");
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="11" style="text-align: center; padding: 40px; color: var(--danger-color);">
+          ${message}
+        </td>
+      </tr>
+    `;
   }
 
   async loadQuizzes() {
@@ -325,8 +453,18 @@ class AdminPanel {
       console.log("[v0] Loading quizzes");
 
       const response = await this.apiRequest("/api/admin/quizzes");
-      if (!response || !response.ok) {
-        console.error("[v0] Quizzes API response failed");
+      if (!response) {
+        console.error("[v0] No response from quizzes API");
+        this.showQuizzesError("Помилка з'єднання з сервером");
+        return;
+      }
+
+      if (!response.ok) {
+        console.error(
+          "[v0] Quizzes API response failed with status:",
+          response.status
+        );
+        this.showQuizzesError("Помилка завантаження тестів");
         return;
       }
 
@@ -338,7 +476,7 @@ class AdminPanel {
       if (!Array.isArray(quizzes) || quizzes.length === 0) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="7" style="text-align: center; padding: 40px; color: var(--text-secondary);">
+            <td colspan="9" style="text-align: center; padding: 40px; color: var(--text-secondary);">
               Тести не знайдені
             </td>
           </tr>
@@ -349,50 +487,58 @@ class AdminPanel {
       tbody.innerHTML = quizzes
         .map(
           (quiz) => `
-          <tr>
-            <td>${quiz.id}</td>
-            <td>${quiz.title}</td>
-            <td>
-              <span class="badge badge-secondary">${quiz.category}</span>
-            </td>
-            <td>
-              <span class="badge ${this.getDifficultyBadgeClass(
-                quiz.difficulty
-              )}">
-                ${this.getDifficultyText(quiz.difficulty)}
-              </span>
-            </td>
-            <td>${quiz.questionCount || quiz.question_count || 0}</td>
-            <td>${new Date(
-              quiz.createdAt || quiz.created_at
-            ).toLocaleDateString("uk-UA")}</td>
-            <td class="actions">
-              <button class="btn btn-success" onclick="adminPanel.editQuiz(${
-                quiz.id
-              })">
-                Редагувати
-              </button>
-              <button class="btn btn-danger" onclick="adminPanel.deleteQuiz(${
-                quiz.id
-              })">
-                Видалити
-              </button>
-            </td>
-          </tr>
-        `
+        <tr>
+          <td>${quiz.id}</td>
+          <td>${quiz.title}</td>
+          <td>
+            <span class="badge badge-secondary">${this.getCategoryName(
+              quiz.category
+            )}</span>
+          </td>
+          <td>
+            <span class="badge ${this.getDifficultyBadgeClass(
+              quiz.difficulty
+            )}">
+              ${this.getDifficultyText(quiz.difficulty)}
+            </span>
+          </td>
+          <td>${quiz.questionCount || quiz.question_count || 0}</td>
+          <td>${quiz.timesTaken || 0}</td>
+          <td>${quiz.averageScore || 0}%</td>
+          <td>${new Date(quiz.createdAt || quiz.created_at).toLocaleDateString(
+            "uk-UA"
+          )}</td>
+          <td class="actions">
+            <button class="btn btn-success" onclick="adminPanel.editQuiz(${
+              quiz.id
+            })">
+              Редагувати
+            </button>
+            <button class="btn btn-danger" onclick="adminPanel.deleteQuiz(${
+              quiz.id
+            })">
+              Видалити
+            </button>
+          </td>
+        </tr>
+      `
         )
         .join("");
     } catch (error) {
       console.error("Error loading quizzes:", error);
-      const tbody = document.querySelector("#quizzesTable tbody");
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="7" style="text-align: center; padding: 40px; color: var(--danger-color);">
-            Помилка завантаження тестів
-          </td>
-        </tr>
-      `;
+      this.showQuizzesError("Помилка завантаження тестів");
     }
+  }
+
+  showQuizzesError(message) {
+    const tbody = document.querySelector("#quizzesTable tbody");
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="9" style="text-align: center; padding: 40px; color: var(--danger-color);">
+          ${message}
+        </td>
+      </tr>
+    `;
   }
 
   async loadResults() {
@@ -402,6 +548,7 @@ class AdminPanel {
       const response = await this.apiRequest("/api/admin/results");
       if (!response || !response.ok) {
         console.error("[v0] Results API response failed");
+        this.showResultsError("Помилка завантаження результатів");
         return;
       }
 
@@ -413,7 +560,7 @@ class AdminPanel {
       if (!Array.isArray(results) || results.length === 0) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="7" style="text-align: center; padding: 40px; color: var(--text-secondary);">
+            <td colspan="8" style="text-align: center; padding: 40px; color: var(--text-secondary);">
               Результати не знайдені
             </td>
           </tr>
@@ -424,41 +571,62 @@ class AdminPanel {
       tbody.innerHTML = results
         .map(
           (result) => `
-          <tr>
-            <td>${result.id}</td>
-            <td>${
-              result.userName || result.user_name || "Невідомий користувач"
-            }</td>
-            <td>${
-              result.quizTitle || result.quiz_title || "Невідомий тест"
-            }</td>
-            <td>
-              <span class="score-badge ${this.getScoreBadgeClass(
-                result.score
-              )}">
-                ${result.score}%
-              </span>
-            </td>
-            <td>${result.correctAnswers || result.correct_answers || 0}</td>
-            <td>${result.totalQuestions || result.total_questions || 0}</td>
-            <td>${new Date(
-              result.completedAt || result.completed_at
-            ).toLocaleDateString("uk-UA")}</td>
-          </tr>
-        `
+        <tr>
+          <td>${result.id}</td>
+          <td>${
+            result.userName || result.user_name || "Невідомий користувач"
+          }</td>
+          <td>${result.quizTitle || result.quiz_title || "Невідомий тест"}</td>
+          <td>
+            <span class="badge badge-secondary">${this.getCategoryName(
+              result.category
+            )}</span>
+          </td>
+          <td>
+            <span class="score-badge ${this.getScoreBadgeClass(result.score)}">
+              ${result.score}%
+            </span>
+          </td>
+          <td>${result.correctAnswers || result.correct_answers || 0}</td>
+          <td>${result.totalQuestions || result.total_questions || 0}</td>
+          <td>${new Date(
+            result.completedAt || result.completed_at
+          ).toLocaleDateString("uk-UA")}</td>
+        </tr>
+      `
         )
         .join("");
     } catch (error) {
       console.error("Error loading results:", error);
-      const tbody = document.querySelector("#resultsTable tbody");
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="7" style="text-align: center; padding: 40px; color: var(--danger-color);">
-            Помилка завантаження результатів
-          </td>
-        </tr>
-      `;
+      this.showResultsError("Помилка завантаження результатів");
     }
+  }
+
+  showResultsError(message) {
+    const tbody = document.querySelector("#resultsTable tbody");
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="8" style="text-align: center; padding: 40px; color: var(--danger-color);">
+          ${message}
+        </td>
+      </tr>
+    `;
+  }
+
+  getCategoryName(category) {
+    const categories = {
+      mathematics: "Математика",
+      ukrainian: "Українська мова",
+      history: "Історія України",
+      biology: "Біологія",
+      chemistry: "Хімія",
+      physics: "Фізика",
+      geography: "Географія",
+      english: "Англійська мова",
+      literature: "Українська література",
+      general: "Загальні знання",
+    };
+    return categories[category] || category;
   }
 
   getDifficultyBadgeClass(difficulty) {
@@ -469,6 +637,8 @@ class AdminPanel {
         return "badge-warning";
       case "hard":
         return "badge-danger";
+      case "expert":
+        return "quiz-difficulty-expert";
       default:
         return "badge-secondary";
     }
@@ -482,6 +652,8 @@ class AdminPanel {
         return "Середня";
       case "hard":
         return "Важка";
+      case "expert":
+        return "Експертна";
       default:
         return "Невідома";
     }
@@ -517,7 +689,7 @@ class AdminPanel {
       }
     } catch (error) {
       console.error("Error loading user for edit:", error);
-      alert("Помилка завантаження даних користувача");
+      this.showNotification("Помилка завантаження даних користувача", "error");
     }
   }
 
@@ -539,6 +711,7 @@ class AdminPanel {
       if (response && response.ok) {
         document.getElementById("editUserModal").style.display = "none";
         this.loadUsers();
+        this.loadDashboard(); // Refresh stats
         this.showNotification("Користувача оновлено успішно", "success");
       } else {
         this.showNotification("Помилка оновлення користувача", "error");
@@ -595,11 +768,60 @@ class AdminPanel {
     }
   }
 
+  async editQuiz(quizId) {
+    try {
+      const response = await this.apiRequest(`/api/admin/quizzes/${quizId}`);
+      if (!response || !response.ok) return;
+
+      const quiz = await response.json();
+
+      // Fill the form with quiz data
+      document.getElementById("quizTitle").value = quiz.title;
+      document.getElementById("quizDescription").value = quiz.description || "";
+      document.getElementById("quizCategory").value = quiz.category;
+      document.getElementById("quizDifficulty").value = quiz.difficulty;
+      document.getElementById("quizTimeLimit").value = quiz.time_limit || 60;
+      document.getElementById("quizPassingScore").value =
+        quiz.passing_score || 60;
+
+      // Clear existing questions and add quiz questions
+      document.getElementById("questionsContainer").innerHTML = "";
+      this.questionCounter = 0;
+
+      if (quiz.questions && Array.isArray(quiz.questions)) {
+        quiz.questions.forEach((question) => {
+          this.addQuestion(question.type || "single");
+          const questionDiv = document.querySelector(
+            `[data-question-id="${this.questionCounter}"]`
+          );
+          questionDiv.querySelector(".question-text").value = question.question;
+
+          if (question.options) {
+            const optionInputs = questionDiv.querySelectorAll(".option-text");
+            question.options.forEach((option, index) => {
+              if (optionInputs[index]) {
+                optionInputs[index].value = option;
+              }
+            });
+          }
+        });
+      }
+
+      // Store quiz ID for updating
+      document.getElementById("createQuizForm").dataset.editingQuizId = quizId;
+      document.getElementById("createQuizModal").style.display = "flex";
+    } catch (error) {
+      console.error("Error loading quiz for edit:", error);
+      this.showNotification("Помилка завантаження тесту", "error");
+    }
+  }
+
   showCreateQuizModal() {
     document.getElementById("createQuizModal").style.display = "flex";
     document.getElementById("questionsContainer").innerHTML = "";
-    this.questionCounter = 0; // Reset counter
-    this.addQuestion("single"); // Add first question with default type
+    this.questionCounter = 0;
+    delete document.getElementById("createQuizForm").dataset.editingQuizId;
+    this.addQuestion("single");
   }
 
   addQuestion(type = "single") {
@@ -753,7 +975,6 @@ class AdminPanel {
     if (!file) return;
 
     if (file.size > 5 * 1024 * 1024) {
-      // 5MB limit
       this.showNotification(
         "Розмір файлу не повинен перевищувати 5MB",
         "error"
@@ -774,7 +995,6 @@ class AdminPanel {
       preview.style.display = "block";
       imageSection.classList.add("has-image");
 
-      // Store image data
       questionDiv.dataset.imageData = e.target.result;
     };
     reader.readAsDataURL(file);
@@ -817,7 +1037,6 @@ class AdminPanel {
       ).textContent = `Питання ${questionNumber}`;
       question.dataset.questionId = questionNumber;
 
-      // Update radio button names for single choice
       const radios = question.querySelectorAll('input[type="radio"]');
       radios.forEach((radio) => {
         if (radio.name.startsWith("correct_")) {
@@ -825,7 +1044,6 @@ class AdminPanel {
         }
       });
 
-      // Update checkbox names for multiple choice
       const checkboxes = question.querySelectorAll('input[type="checkbox"]');
       checkboxes.forEach((checkbox) => {
         if (checkbox.name.startsWith("correct_")) {
@@ -962,10 +1180,21 @@ class AdminPanel {
 
       const submitBtn = form.querySelector('button[type="submit"]');
       const originalText = submitBtn.textContent;
-      submitBtn.textContent = "⏳ Створення тесту...";
 
-      const response = await this.apiRequest("/api/admin/quizzes", {
-        method: "POST",
+      const editingQuizId = form.dataset.editingQuizId;
+      const isEditing = !!editingQuizId;
+
+      submitBtn.textContent = isEditing
+        ? "⏳ Оновлення тесту..."
+        : "⏳ Створення тесту...";
+
+      const url = isEditing
+        ? `/api/admin/quizzes/${editingQuizId}`
+        : "/api/admin/quizzes";
+      const method = isEditing ? "PUT" : "POST";
+
+      const response = await this.apiRequest(url, {
+        method: method,
         body: JSON.stringify({
           title,
           description,
@@ -981,22 +1210,26 @@ class AdminPanel {
         document.getElementById("createQuizModal").style.display = "none";
         this.loadQuizzes();
         this.loadDashboard();
-        this.showNotification("Тест створено успішно! 🎉", "success");
+        this.showNotification(
+          isEditing ? "Тест оновлено успішно! 🎉" : "Тест створено успішно! 🎉",
+          "success"
+        );
 
         // Reset form
         document.getElementById("createQuizForm").reset();
         document.getElementById("questionsContainer").innerHTML = "";
         this.questionCounter = 0;
+        delete form.dataset.editingQuizId;
       } else {
         const errorData = await response.json();
         this.showNotification(
-          errorData.error || "Помилка створення тесту",
+          errorData.error || "Помилка збереження тесту",
           "error"
         );
       }
     } catch (error) {
-      console.error("Error creating quiz:", error);
-      this.showNotification("Помилка створення тесту", "error");
+      console.error("Error saving quiz:", error);
+      this.showNotification("Помилка збереження тесту", "error");
     } finally {
       const form = document.getElementById("createQuizForm");
       form.classList.remove("creating-quiz");
@@ -1007,7 +1240,6 @@ class AdminPanel {
   }
 
   showNotification(message, type = "info") {
-    // Remove existing notifications
     const existing = document.querySelector(".notification");
     if (existing) {
       existing.remove();
@@ -1019,12 +1251,10 @@ class AdminPanel {
 
     document.body.appendChild(notification);
 
-    // Show notification
     setTimeout(() => {
       notification.classList.add("show");
     }, 100);
 
-    // Hide notification after 3 seconds
     setTimeout(() => {
       notification.classList.remove("show");
       setTimeout(() => {
@@ -1146,7 +1376,6 @@ const notificationStyles = `
 }
 `;
 
-// Add styles to document
 const styleSheet = document.createElement("style");
 styleSheet.textContent = notificationStyles;
 document.head.appendChild(styleSheet);

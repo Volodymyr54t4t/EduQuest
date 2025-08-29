@@ -17,7 +17,8 @@ const pool = new Pool({
 });
 
 // Middleware
-app.use(express.json());
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use(express.static("."));
 
 // JWT Secret
@@ -72,7 +73,6 @@ const requireAdmin = async (req, res, next) => {
 
 async function initDatabase() {
   try {
-    // Users table
     await pool.query(`CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY,
       email VARCHAR(255) UNIQUE NOT NULL,
@@ -87,6 +87,10 @@ async function initDatabase() {
       subjects TEXT,
       role VARCHAR(20) DEFAULT 'student',
       total_score INTEGER DEFAULT 0,
+      tests_completed INTEGER DEFAULT 0,
+      average_score DECIMAL(5,2) DEFAULT 0,
+      last_login TIMESTAMP,
+      is_active BOOLEAN DEFAULT true,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`);
@@ -100,6 +104,10 @@ async function initDatabase() {
       time_limit INTEGER DEFAULT 60,
       passing_score INTEGER DEFAULT 60,
       questions JSONB NOT NULL,
+      times_taken INTEGER DEFAULT 0,
+      average_score DECIMAL(5,2) DEFAULT 0,
+      is_active BOOLEAN DEFAULT true,
+      created_by INTEGER REFERENCES users(id),
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`);
@@ -114,8 +122,82 @@ async function initDatabase() {
       time_spent INTEGER DEFAULT 0,
       results JSONB NOT NULL,
       category VARCHAR(100),
+      difficulty VARCHAR(20),
+      ip_address INET,
+      user_agent TEXT,
       completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`);
+
+    try {
+      await pool.query(
+        `ALTER TABLE users ADD COLUMN IF NOT EXISTS tests_completed INTEGER DEFAULT 0`
+      );
+      await pool.query(
+        `ALTER TABLE users ADD COLUMN IF NOT EXISTS average_score DECIMAL(5,2) DEFAULT 0`
+      );
+      await pool.query(
+        `ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login TIMESTAMP`
+      );
+      await pool.query(
+        `ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true`
+      );
+
+      await pool.query(
+        `ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS times_taken INTEGER DEFAULT 0`
+      );
+      await pool.query(
+        `ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS average_score DECIMAL(5,2) DEFAULT 0`
+      );
+      await pool.query(
+        `ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true`
+      );
+      await pool.query(
+        `ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS created_by INTEGER REFERENCES users(id)`
+      );
+      await pool.query(
+        `ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS time_limit INTEGER DEFAULT 60`
+      );
+      await pool.query(
+        `ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS passing_score INTEGER DEFAULT 60`
+      );
+
+      await pool.query(
+        `ALTER TABLE test_results ADD COLUMN IF NOT EXISTS difficulty VARCHAR(20)`
+      );
+      await pool.query(
+        `ALTER TABLE test_results ADD COLUMN IF NOT EXISTS ip_address INET`
+      );
+      await pool.query(
+        `ALTER TABLE test_results ADD COLUMN IF NOT EXISTS user_agent TEXT`
+      );
+    } catch (alterError) {
+      console.log("Some columns may already exist:", alterError.message);
+    }
+
+    await pool.query(
+      `CREATE INDEX IF NOT EXISTS idx_users_role ON users(role)`
+    );
+    await pool.query(
+      `CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)`
+    );
+    await pool.query(
+      `CREATE INDEX IF NOT EXISTS idx_users_is_active ON users(is_active)`
+    );
+    await pool.query(
+      `CREATE INDEX IF NOT EXISTS idx_quizzes_category ON quizzes(category)`
+    );
+    await pool.query(
+      `CREATE INDEX IF NOT EXISTS idx_quizzes_is_active ON quizzes(is_active)`
+    );
+    await pool.query(
+      `CREATE INDEX IF NOT EXISTS idx_test_results_user_id ON test_results(user_id)`
+    );
+    await pool.query(
+      `CREATE INDEX IF NOT EXISTS idx_test_results_quiz_id ON test_results(quiz_id)`
+    );
+    await pool.query(
+      `CREATE INDEX IF NOT EXISTS idx_test_results_completed_at ON test_results(completed_at)`
+    );
 
     // Insert default quizzes if they don't exist
     const quizCount = await pool.query("SELECT COUNT(*) FROM quizzes");
@@ -179,7 +261,7 @@ async function initDatabase() {
     // Create default admin user
     await createDefaultAdmin();
 
-    console.log("Database tables initialized");
+    console.log("Database tables initialized successfully");
   } catch (error) {
     console.error("Database initialization error:", error);
   }
