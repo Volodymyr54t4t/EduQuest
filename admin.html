@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="admin.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Geist+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 
 <body>
@@ -16,28 +16,16 @@
     <div id="loginModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <div class="login-header-content">
-                    <div class="login-icon">🔐</div>
-                    <h2>Вхід в адміністративну панель</h2>
-                    <p>Введіть пароль для доступу до системи управління</p>
-                </div>
+                <h2>🔐 Вхід в адміністративну панель</h2>
             </div>
             <div class="modal-body">
                 <form id="loginForm">
                     <div class="form-group">
                         <label for="password">Пароль адміністратора:</label>
-                        <div class="password-input-container">
-                            <input type="password" id="password" name="password" required placeholder="Введіть пароль"
-                                autocomplete="current-password">
-                            <button type="button" class="password-toggle" id="passwordToggle">
-                                <span class="toggle-icon">👁️</span>
-                            </button>
-                        </div>
+                        <input type="password" id="password" name="password" required placeholder="Введіть пароль"
+                            autocomplete="current-password">
                     </div>
-                    <button type="submit" class="btn btn-primary login-btn">
-                        <span class="btn-icon">🚀</span>
-                        Увійти в систему
-                    </button>
+                    <button type="submit" class="btn btn-primary">Увійти</button>
                 </form>
                 <div id="loginError" class="error-message"></div>
             </div>
@@ -49,61 +37,20 @@
         <!-- Header -->
         <header class="admin-header">
             <div class="header-content">
-                <div class="header-left">
-                    <div class="admin-logo">
-                        <div class="logo-icon">⚡</div>
-                        <h1>Адміністративна панель</h1>
-                    </div>
-                    <div class="header-stats">
-                        <div class="stat-item">
-                            <span class="stat-value" id="headerUsersCount">0</span>
-                            <span class="stat-label">Користувачів</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-value" id="headerTestsCount">0</span>
-                            <span class="stat-label">Тестів</span>
-                        </div>
-                    </div>
-                </div>
+                <h1>Адміністративна панель</h1>
                 <div class="header-actions">
-                    <div class="admin-info-container">
-                        <div class="admin-avatar">А</div>
-                        <div class="admin-details">
-                            <span id="adminInfo" class="admin-name">Адміністратор</span>
-                            <span class="admin-role">Системний адміністратор</span>
-                        </div>
-                    </div>
-                    <button id="logoutBtn" class="btn btn-secondary logout-btn">
-                        <span class="btn-icon">🚪</span>
-                        Вийти
-                    </button>
+                    <span id="adminInfo" class="admin-info"></span>
+                    <button id="logoutBtn" class="btn btn-secondary">Вийти</button>
                 </div>
             </div>
         </header>
 
         <!-- Navigation -->
         <nav class="admin-nav">
-            <div class="nav-container">
-                <button class="nav-btn active" data-section="dashboard">
-                    <span class="nav-icon">📊</span>
-                    <span class="nav-text">Дашборд</span>
-                </button>
-                <button class="nav-btn" data-section="users">
-                    <span class="nav-icon">👥</span>
-                    <span class="nav-text">Користувачі</span>
-                    <span class="nav-count" id="navUsersCount">0</span>
-                </button>
-                <button class="nav-btn" data-section="quizzes">
-                    <span class="nav-icon">📝</span>
-                    <span class="nav-text">Тести</span>
-                    <span class="nav-count" id="navQuizzesCount">0</span>
-                </button>
-                <button class="nav-btn" data-section="results">
-                    <span class="nav-icon">📈</span>
-                    <span class="nav-text">Результати</span>
-                    <span class="nav-count" id="navResultsCount">0</span>
-                </button>
-            </div>
+            <button class="nav-btn active" data-section="dashboard">📊 Дашборд</button>
+            <button class="nav-btn" data-section="users">👥 Користувачі</button>
+            <button class="nav-btn" data-section="quizzes">📝 Тести</button>
+            <button class="nav-btn" data-section="results">📈 Результати</button>
         </nav>
 
         <!-- Main Content -->
@@ -111,132 +58,24 @@
             <!-- Dashboard Section -->
             <section id="dashboard" class="admin-section active">
                 <div class="section-header">
-                    <div class="section-title-container">
-                        <h2>Статистика платформи</h2>
-                        <p>Огляд активності та ключових показників системи</p>
-                    </div>
-                    <div class="section-actions">
-                        <button class="btn btn-secondary refresh-btn" id="refreshDashboard">
-                            <span class="btn-icon">🔄</span>
-                            Оновити
-                        </button>
-                        <button class="btn btn-primary export-btn">
-                            <span class="btn-icon">📊</span>
-                            Експорт звіту
-                        </button>
-                    </div>
+                    <h2>Статистика платформи</h2>
                 </div>
-                
                 <div class="stats-grid">
-                    <div class="stat-card primary">
-                        <div class="stat-header">
-                            <div class="stat-icon">👥</div>
-                            <div class="stat-trend">
-                                <span class="trend-value">+12%</span>
-                                <span class="trend-period">цього місяця</span>
-                            </div>
-                        </div>
-                        <div class="stat-content">
-                            <div class="stat-number" id="statsUsers">Завантаження...</div>
-                            <div class="stat-label">Активних користувачів</div>
-                            <div class="stat-sublabel">Зареєстровано за весь час</div>
-                        </div>
+                    <div class="stat-card">
+                        <h3>👥 Користувачі</h3>
+                        <div class="stat-number" id="statsUsers">Завантаження...</div>
                     </div>
-                    
-                    <div class="stat-card success">
-                        <div class="stat-header">
-                            <div class="stat-icon">📝</div>
-                            <div class="stat-trend">
-                                <span class="trend-value">+8%</span>
-                                <span class="trend-period">цього тижня</span>
-                            </div>
-                        </div>
-                        <div class="stat-content">
-                            <div class="stat-number" id="statsQuizzes">Завантаження...</div>
-                            <div class="stat-label">Доступних тестів</div>
-                            <div class="stat-sublabel">Створено адміністраторами</div>
-                        </div>
+                    <div class="stat-card">
+                        <h3>📝 Тести</h3>
+                        <div class="stat-number" id="statsQuizzes">Завантаження...</div>
                     </div>
-                    
-                    <div class="stat-card info">
-                        <div class="stat-header">
-                            <div class="stat-icon">📊</div>
-                            <div class="stat-trend">
-                                <span class="trend-value">+25%</span>
-                                <span class="trend-period">цього місяця</span>
-                            </div>
-                        </div>
-                        <div class="stat-content">
-                            <div class="stat-number" id="statsResults">Завантаження...</div>
-                            <div class="stat-label">Результатів тестування</div>
-                            <div class="stat-sublabel">Всього пройдено тестів</div>
-                        </div>
+                    <div class="stat-card">
+                        <h3>📊 Результати</h3>
+                        <div class="stat-number" id="statsResults">Завантаження...</div>
                     </div>
-                    
-                    <div class="stat-card warning">
-                        <div class="stat-header">
-                            <div class="stat-icon">🎯</div>
-                            <div class="stat-trend">
-                                <span class="trend-value">+3%</span>
-                                <span class="trend-period">покращення</span>
-                            </div>
-                        </div>
-                        <div class="stat-content">
-                            <div class="stat-number" id="statsAvgScore">Завантаження...</div>
-                            <div class="stat-label">Середній бал</div>
-                            <div class="stat-sublabel">По всіх тестах НМТ</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="dashboard-grid">
-                    <div class="activity-timeline">
-                        <h3>Остання активність</h3>
-                        <div class="timeline-items">
-                            <div class="timeline-item">
-                                <div class="timeline-icon">👤</div>
-                                <div class="timeline-content">
-                                    <div class="timeline-title">Новий користувач зареєстрований</div>
-                                    <div class="timeline-time">5 хвилин тому</div>
-                                </div>
-                            </div>
-                            <div class="timeline-item">
-                                <div class="timeline-icon">📝</div>
-                                <div class="timeline-content">
-                                    <div class="timeline-title">Створено новий тест з математики</div>
-                                    <div class="timeline-time">1 година тому</div>
-                                </div>
-                            </div>
-                            <div class="timeline-item">
-                                <div class="timeline-icon">🏆</div>
-                                <div class="timeline-content">
-                                    <div class="timeline-title">Студент досягнув 100% результату</div>
-                                    <div class="timeline-time">2 години тому</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="quick-actions">
-                        <h3>Швидкі дії</h3>
-                        <div class="action-buttons">
-                            <button class="quick-action-btn" data-action="create-user">
-                                <span class="action-icon">👤</span>
-                                <span class="action-text">Додати користувача</span>
-                            </button>
-                            <button class="quick-action-btn" data-action="create-quiz">
-                                <span class="action-icon">📝</span>
-                                <span class="action-text">Створити тест</span>
-                            </button>
-                            <button class="quick-action-btn" data-action="view-reports">
-                                <span class="action-icon">📊</span>
-                                <span class="action-text">Переглянути звіти</span>
-                            </button>
-                            <button class="quick-action-btn" data-action="system-settings">
-                                <span class="action-icon">⚙️</span>
-                                <span class="action-text">Налаштування</span>
-                            </button>
-                        </div>
+                    <div class="stat-card">
+                        <h3>🎯 Середній бал</h3>
+                        <div class="stat-number" id="statsAvgScore">Завантаження...</div>
                     </div>
                 </div>
             </section>
@@ -397,7 +236,8 @@
                     </div>
                     <div class="form-actions">
                         <button type="submit" class="btn btn-primary">💾 Зберегти</button>
-                        <button type="button" class="btn btn-secondary" onclick="closeEditUserModal()">❌ Скасувати</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeEditUserModal()">❌
+                            Скасувати</button>
                     </div>
                 </form>
             </div>
@@ -469,14 +309,16 @@
                                     <option value="text-input">Текстова відповідь</option>
                                     <option value="true-false">Правда/Неправда</option>
                                 </select>
-                                <button type="button" id="addQuestion" class="btn btn-secondary">➕ Додати питання</button>
+                                <button type="button" id="addQuestion" class="btn btn-secondary">➕ Додати
+                                    питання</button>
                             </div>
                         </div>
                         <div id="questionsContainer"></div>
                     </div>
                     <div class="form-actions">
                         <button type="submit" class="btn btn-primary">✅ Створити тест</button>
-                        <button type="button" class="btn btn-secondary" onclick="closeCreateQuizModal()">❌ Скасувати</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeCreateQuizModal()">❌
+                            Скасувати</button>
                     </div>
                 </form>
             </div>
@@ -497,20 +339,6 @@
     </div>
 
     <script src="admin.js"></script>
-    <script>
-        document.getElementById('passwordToggle')?.addEventListener('click', function() {
-            const passwordInput = document.getElementById('password');
-            const toggleIcon = this.querySelector('.toggle-icon');
-            
-            if (passwordInput.type === 'password') {
-                passwordInput.type = 'text';
-                toggleIcon.textContent = '🙈';
-            } else {
-                passwordInput.type = 'password';
-                toggleIcon.textContent = '👁️';
-            }
-        });
-    </script>
 </body>
 
 </html>

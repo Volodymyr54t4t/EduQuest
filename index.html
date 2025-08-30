@@ -1,188 +1,261 @@
 <!DOCTYPE html>
-<html lang="uk">
+<html lang="uk" class="scroll-smooth">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Підготовка до НМТ - Освітня Платформа</title>
+    <title>НМТ Підготовка - Освітня Платформа Майбутнього</title>
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
-        href="https://fonts.googleapis.com/css2?family=Geist+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&family=Open+Sans:wght@300;400;500;600&display=swap"
         rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        'sans': ['Montserrat', 'system-ui', 'sans-serif'],
+                        'body': ['Open Sans', 'system-ui', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: '#059669',
+                        secondary: '#10b981',
+                        accent: '#ec4899',
+                        neutral: {
+                            50: '#f8fafc',
+                            100: '#f1f5f9',
+                            200: '#e2e8f0',
+                            300: '#cbd5e1',
+                            400: '#94a3b8',
+                            500: '#64748b',
+                            600: '#475569',
+                            700: '#334155',
+                            800: '#1e293b',
+                            900: '#0f172a',
+                        }
+                    },
+                    animation: {
+                        'float': 'float 3s ease-in-out infinite',
+                        'pulse-glow': 'pulse-glow 2s ease-in-out infinite',
+                        'gradient': 'gradient-shift 3s ease infinite',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @keyframes float {
+
+            0%,
+            100% {
+                transform: translateY(0px);
+            }
+
+            50% {
+                transform: translateY(-10px);
+            }
+        }
+
+        @keyframes pulse-glow {
+
+            0%,
+            100% {
+                box-shadow: 0 0 20px rgba(5, 150, 105, 0.3);
+            }
+
+            50% {
+                box-shadow: 0 0 30px rgba(5, 150, 105, 0.5);
+            }
+        }
+
+        @keyframes gradient-shift {
+            0% {
+                background-position: 0% 50%;
+            }
+
+            50% {
+                background-position: 100% 50%;
+            }
+
+            100% {
+                background-position: 0% 50%;
+            }
+        }
+
+        .glass-effect {
+            backdrop-filter: blur(20px);
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .gradient-text {
+            background: linear-gradient(135deg, #059669, #10b981, #ec4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero-gradient {
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #cbd5e1 100%);
+        }
+
+        .card-hover {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .card-hover:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+    </style>
 </head>
 
-<body>
-    <div class="app">
-        <!-- Sidebar -->
-        <aside class="sidebar">
-            <div class="sidebar-header">
-                <!-- Updated logo and title for NMT preparation -->
-                <div class="logo-container">
-                    <div class="logo-icon">🎓</div>
-                    <h1 class="logo">НМТ Підготовка</h1>
-                </div>
-                <!-- Added user progress indicator -->
-                <div class="user-progress">
-                    <div class="progress-ring">
-                        <div class="progress-value" id="overallProgress">75%</div>
+<body class="bg-gradient-to-br from-neutral-50 via-white to-neutral-100 min-h-screen">
+    <div class="app flex min-h-screen">
+        <!-- Enhanced Sidebar -->
+        <aside
+            class="sidebar w-80 bg-white/80 backdrop-blur-xl border-r border-neutral-200/50 shadow-2xl fixed h-full z-50">
+            <div class="sidebar-header p-8 border-b border-neutral-200/50">
+                <div class="flex items-center space-x-4">
+                    <div
+                        class="w-12 h-12 bg-gradient-to-br from-primary to-secondary rounded-2xl flex items-center justify-center animate-pulse-glow">
+                        <span class="text-2xl">🎓</span>
                     </div>
-                    <span class="progress-label">Загальний прогрес</span>
+                    <div>
+                        <h1 class="text-2xl font-black gradient-text">НМТ Підготовка</h1>
+                        <p class="text-sm text-neutral-500 font-body">Освітня платформа майбутнього</p>
+                    </div>
                 </div>
             </div>
-            <nav class="sidebar-nav">
-                <button class="nav-item active" data-section="dashboard">
-                    <span class="nav-icon">📊</span>
-                    <span class="nav-text">Панель управління</span>
-                    <!-- Added notification badge -->
-                    <span class="nav-badge">3</span>
-                </button>
-                <button class="nav-item" data-section="quizzes">
-                    <span class="nav-icon">📝</span>
-                    <span class="nav-text">Тести НМТ</span>
-                </button>
-                <button class="nav-item" data-section="leaderboard">
-                    <span class="nav-icon">🏆</span>
-                    <span class="nav-text">Рейтинг</span>
-                </button>
-                <button class="nav-item" data-section="statistics">
-                    <span class="nav-icon">📈</span>
-                    <span class="nav-text">Статистика</span>
-                </button>
-                <!-- Enhanced profile link with better styling -->
-                <a href="./profile.html" class="nav-item nav-link">
-                    <span class="nav-icon">👤</span>
-                    <span class="nav-text">Профіль</span>
-                </a>
-            </nav>
-            <div class="user-info">
-                <!-- Enhanced user info with status indicator -->
-                <div class="user-avatar">
-                    <span class="avatar-text">С1</span>
-                    <div class="status-indicator online"></div>
+
+            <nav class="sidebar-nav flex-1 p-6">
+                <div class="space-y-3">
+                    <button
+                        class="nav-item active w-full p-4 rounded-2xl bg-gradient-to-r from-primary to-secondary text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center space-x-3"
+                        data-section="dashboard">
+                        <span class="text-xl">📊</span>
+                        <span>Панель управління</span>
+                    </button>
+                    <button
+                        class="nav-item w-full p-4 rounded-2xl bg-white/50 hover:bg-gradient-to-r hover:from-primary/10 hover:to-secondary/10 text-neutral-700 font-medium transition-all duration-300 flex items-center space-x-3 border border-neutral-200/50"
+                        data-section="quizzes">
+                        <span class="text-xl">📝</span>
+                        <span>Тести НМТ</span>
+                    </button>
+                    <button
+                        class="nav-item w-full p-4 rounded-2xl bg-white/50 hover:bg-gradient-to-r hover:from-primary/10 hover:to-secondary/10 text-neutral-700 font-medium transition-all duration-300 flex items-center space-x-3 border border-neutral-200/50"
+                        data-section="leaderboard">
+                        <span class="text-xl">🏆</span>
+                        <span>Рейтинг</span>
+                    </button>
+                    <button
+                        class="nav-item w-full p-4 rounded-2xl bg-white/50 hover:bg-gradient-to-r hover:from-primary/10 hover:to-secondary/10 text-neutral-700 font-medium transition-all duration-300 flex items-center space-x-3 border border-neutral-200/50"
+                        data-section="statistics">
+                        <span class="text-xl">📈</span>
+                        <span>Статистика</span>
+                    </button>
+                    <a href="./profile.html"
+                        class="block w-full p-4 rounded-2xl bg-white/50 hover:bg-gradient-to-r hover:from-accent/10 hover:to-accent/20 text-neutral-700 font-medium transition-all duration-300 border border-neutral-200/50">
+                        <div class="flex items-center space-x-3">
+                            <span class="text-xl">👤</span>
+                            <span>Профіль</span>
+                        </div>
+                    </a>
+                    <a href="./materials.html"
+                        class="block w-full p-4 rounded-2xl bg-white/50 hover:bg-gradient-to-r hover:from-accent/10 hover:to-accent/20 text-neutral-700 font-medium transition-all duration-300 border border-neutral-200/50">
+                        <div class="flex items-center space-x-3">
+                            <span class="text-xl">📚</span>
+                            <span>Матеріали</span>
+                        </div>
+                    </a>
+                    <a href="./auth.html"
+                        class="block w-full p-4 rounded-2xl bg-white/50 hover:bg-gradient-to-r hover:from-accent/10 hover:to-accent/20 text-neutral-700 font-medium transition-all duration-300 border border-neutral-200/50">
+                        <div class="flex items-center space-x-3">
+                            <span class="text-xl">🔑</span>
+                            <span>Авторизація</span>
+                        </div>
+                    </a>
                 </div>
-                <div class="user-details">
-                    <div class="user-name" id="currentUserName">Студент 1</div>
-                    <div class="user-role" id="currentUserRole">student</div>
-                    <div class="user-streak">🔥 Серія: 7 днів</div>
+            </nav>
+
+            <div class="user-info p-6 border-t border-neutral-200/50">
+                <div
+                    class="flex items-center space-x-4 p-4 rounded-2xl bg-gradient-to-r from-neutral-100 to-white border border-neutral-200/50">
+                    <div
+                        class="w-12 h-12 bg-gradient-to-br from-accent to-primary rounded-full flex items-center justify-center text-white font-bold text-lg animate-float">
+                        👤
+                    </div>
+                    <div class="flex-1">
+                        <div class="font-semibold text-neutral-800" id="currentUserName">Студент 1</div>
+                        <div class="text-sm text-neutral-500 capitalize font-body" id="currentUserRole">student</div>
+                    </div>
                 </div>
             </div>
         </aside>
 
-        <!-- Main Content -->
-        <main class="main-content">
+        <!-- Enhanced Main Content -->
+        <main class="main-content flex-1 ml-80 p-8">
             <!-- Dashboard Section -->
             <section id="dashboard" class="content-section active">
-                <div class="section-header">
-                    <!-- Updated dashboard title for NMT context -->
-                    <div class="header-content">
-                        <div class="header-text">
-                            <h2>Панель управління НМТ</h2>
-                            <p>Ласкаво просимо до платформи підготовки до НМТ</p>
-                            <div class="header-meta">
-                                <span class="current-time" id="currentTime"></span>
-                                <span class="weather-info">☀️ 22°C Київ</span>
+                <div class="section-header mb-12">
+                    <div class="text-center mb-8">
+                        <h2 class="text-5xl font-black gradient-text mb-4">Панель управління НМТ</h2>
+                        <p class="text-xl text-neutral-600 font-body max-w-2xl mx-auto">Ласкаво просимо до найсучаснішої
+                            платформи підготовки до НМТ в Україні</p>
+                    </div>
+                </div>
+
+                <div class="stats-grid grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+                    <div
+                        class="stat-card bg-white/80 backdrop-blur-xl p-8 rounded-3xl shadow-2xl border border-neutral-200/50 card-hover">
+                        <div class="flex items-center space-x-6">
+                            <div
+                                class="w-16 h-16 bg-gradient-to-br from-primary to-secondary rounded-2xl flex items-center justify-center text-3xl animate-float">
+                                📝</div>
+                            <div>
+                                <div class="text-4xl font-black text-primary mb-2" id="userTestsCompleted">0</div>
+                                <div class="text-neutral-600 font-body font-medium">Тестів НМТ пройдено</div>
                             </div>
                         </div>
-                        <!-- Added quick action buttons -->
-                        <div class="header-actions">
-                            <button class="action-btn primary">
-                                <span class="btn-icon">🚀</span>
-                                Почати тест
-                            </button>
-                            <button class="action-btn secondary">
-                                <span class="btn-icon">📚</span>
-                                Матеріали
-                            </button>
+                    </div>
+                    <div
+                        class="stat-card bg-white/80 backdrop-blur-xl p-8 rounded-3xl shadow-2xl border border-neutral-200/50 card-hover">
+                        <div class="flex items-center space-x-6">
+                            <div class="w-16 h-16 bg-gradient-to-br from-secondary to-accent rounded-2xl flex items-center justify-center text-3xl animate-float"
+                                style="animation-delay: 0.5s;">⭐</div>
+                            <div>
+                                <div class="text-4xl font-black text-secondary mb-2" id="userAverageScore">0%</div>
+                                <div class="text-neutral-600 font-body font-medium">Середній бал НМТ</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div
+                        class="stat-card bg-white/80 backdrop-blur-xl p-8 rounded-3xl shadow-2xl border border-neutral-200/50 card-hover">
+                        <div class="flex items-center space-x-6">
+                            <div class="w-16 h-16 bg-gradient-to-br from-accent to-primary rounded-2xl flex items-center justify-center text-3xl animate-float"
+                                style="animation-delay: 1s;">🎯</div>
+                            <div>
+                                <div class="text-4xl font-black text-accent mb-2" id="userTotalScore">0</div>
+                                <div class="text-neutral-600 font-body font-medium">Загальний бал</div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Enhanced stats grid with better visual hierarchy -->
-                <div class="stats-grid">
-                    <div class="stat-card primary">
-                        <div class="stat-header">
-                            <div class="stat-icon">📝</div>
-                            <div class="stat-trend up">+12%</div>
-                        </div>
-                        <div class="stat-content">
-                            <div class="stat-number" id="userTestsCompleted">24</div>
-                            <div class="stat-label">Тестів НМТ пройдено</div>
-                            <div class="stat-sublabel">За цей місяць</div>
-                        </div>
-                    </div>
-                    <div class="stat-card success">
-                        <div class="stat-header">
-                            <div class="stat-icon">⭐</div>
-                            <div class="stat-trend up">+5%</div>
-                        </div>
-                        <div class="stat-content">
-                            <div class="stat-number" id="userAverageScore">87%</div>
-                            <div class="stat-label">Середній бал НМТ</div>
-                            <div class="stat-sublabel">Покращення на 5%</div>
-                        </div>
-                    </div>
-                    <div class="stat-card warning">
-                        <div class="stat-header">
-                            <div class="stat-icon">🎯</div>
-                            <div class="stat-trend neutral">0%</div>
-                        </div>
-                        <div class="stat-content">
-                            <div class="stat-number" id="userTotalScore">2,156</div>
-                            <div class="stat-label">Загальний бал</div>
-                            <div class="stat-sublabel">Всього набрано</div>
-                        </div>
-                    </div>
-                    <!-- Added new streak stat card -->
-                    <div class="stat-card info">
-                        <div class="stat-header">
-                            <div class="stat-icon">🔥</div>
-                            <div class="stat-trend up">+1</div>
-                        </div>
-                        <div class="stat-content">
-                            <div class="stat-number">7</div>
-                            <div class="stat-label">Днів поспіль</div>
-                            <div class="stat-sublabel">Активна серія</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Enhanced recent activity with better layout -->
-                <div class="dashboard-grid">
-                    <div class="recent-activity">
-                        <div class="section-title">
-                            <h3>Останні результати НМТ</h3>
-                            <button class="view-all-btn">Переглянути всі</button>
-                        </div>
-                        <div id="recentResults" class="results-list">
-                            <!-- Recent results will be loaded here -->
-                        </div>
-                    </div>
-
-                    <!-- Added upcoming tests section -->
-                    <div class="upcoming-tests">
-                        <div class="section-title">
-                            <h3>Заплановані тести</h3>
-                            <button class="schedule-btn">Розклад</button>
-                        </div>
-                        <div class="test-schedule">
-                            <div class="test-item">
-                                <div class="test-time">14:30</div>
-                                <div class="test-info">
-                                    <div class="test-name">Математика - Рівень 1</div>
-                                    <div class="test-duration">45 хвилин</div>
-                                </div>
-                                <button class="join-btn">Приєднатися</button>
-                            </div>
-                            <div class="test-item">
-                                <div class="test-time">16:00</div>
-                                <div class="test-info">
-                                    <div class="test-name">Українська мова</div>
-                                    <div class="test-duration">60 хвилин</div>
-                                </div>
-                                <button class="join-btn disabled">Очікування</button>
-                            </div>
+                <div
+                    class="recent-activity bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-neutral-200/50 p-8">
+                    <h3 class="text-3xl font-bold text-neutral-800 mb-6 flex items-center space-x-3">
+                        <span class="text-4xl">📊</span>
+                        <span>Останні результати НМТ</span>
+                    </h3>
+                    <div id="recentResults" class="results-list space-y-4">
+                        <div
+                            class="p-6 bg-gradient-to-r from-neutral-50 to-white rounded-2xl border border-neutral-200/50">
+                            <p class="text-neutral-500 font-body text-center">Результати з'являться після проходження
+                                тестів</p>
                         </div>
                     </div>
                 </div>
@@ -190,60 +263,50 @@
 
             <!-- Quizzes Section -->
             <section id="quizzes" class="content-section">
-                <div class="section-header">
-                    <!-- Updated quizzes header with filters -->
-                    <div class="header-content">
-                        <div class="header-text">
-                            <h2>Тести для підготовки до НМТ</h2>
-                            <p>Оберіть тест НМТ для проходження</p>
-                        </div>
-                        <div class="quiz-filters">
-                            <select class="filter-select" id="subjectFilter">
-                                <option value="">Всі предмети</option>
-                                <option value="mathematics">Математика</option>
-                                <option value="ukrainian">Українська мова</option>
-                                <option value="history">Історія України</option>
-                            </select>
-                            <select class="filter-select" id="difficultyFilter">
-                                <option value="">Всі рівні</option>
-                                <option value="easy">Легкий</option>
-                                <option value="medium">Середній</option>
-                                <option value="hard">Важкий</option>
-                            </select>
-                        </div>
-                    </div>
+                <div class="section-header mb-12 text-center">
+                    <h2 class="text-5xl font-black gradient-text mb-4">Тести для підготовки до НМТ</h2>
+                    <p class="text-xl text-neutral-600 font-body max-w-2xl mx-auto">Оберіть тест НМТ для проходження та
+                        покращення своїх результатів</p>
                 </div>
 
-                <div id="quizzesList" class="quizzes-grid">
+                <div id="quizzesList" class="quizzes-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                     <!-- Quizzes will be loaded here -->
                 </div>
             </section>
 
             <!-- Quiz Taking Section -->
             <section id="quiz-taking" class="content-section">
-                <div class="quiz-container">
-                    <div class="quiz-header">
-                        <h2 id="quizTitle"></h2>
-                        <div class="quiz-progress">
-                            <div class="progress-bar">
-                                <div class="progress-fill" id="progressFill"></div>
+                <div class="quiz-container max-w-4xl mx-auto">
+                    <div
+                        class="quiz-header text-center mb-12 p-8 bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl border border-neutral-200/50">
+                        <h2 id="quizTitle" class="text-4xl font-black gradient-text mb-6"></h2>
+                        <div class="quiz-progress flex items-center justify-center space-x-6">
+                            <div class="progress-bar w-80 h-4 bg-neutral-200 rounded-full overflow-hidden">
+                                <div class="progress-fill h-full bg-gradient-to-r from-primary to-secondary transition-all duration-500 rounded-full"
+                                    id="progressFill"></div>
                             </div>
-                            <span id="progressText">1 з 10</span>
+                            <span id="progressText" class="text-lg font-semibold text-neutral-700">1 з 10</span>
                         </div>
                     </div>
 
-                    <div class="question-container">
-                        <h3 id="questionText"></h3>
-                        <div id="optionsContainer" class="options-container">
+                    <div
+                        class="question-container bg-white/80 backdrop-blur-xl p-10 rounded-3xl shadow-2xl border border-neutral-200/50 mb-8">
+                        <h3 id="questionText" class="text-2xl font-bold text-neutral-800 mb-8 leading-relaxed"></h3>
+                        <div id="optionsContainer" class="options-container space-y-4">
                             <!-- Options will be loaded here -->
                         </div>
                     </div>
 
-                    <div class="quiz-controls">
-                        <button id="prevQuestion" class="btn btn-secondary" disabled>Попереднє</button>
-                        <button id="nextQuestion" class="btn btn-primary">Наступне</button>
-                        <!-- Enhanced submit button with better text -->
-                        <button id="submitQuiz" class="btn btn-success" style="display: none;">
+                    <div class="quiz-controls flex justify-between items-center space-x-4">
+                        <button id="prevQuestion"
+                            class="px-8 py-4 bg-neutral-200 hover:bg-neutral-300 text-neutral-700 font-semibold rounded-2xl transition-all duration-300 disabled:opacity-50"
+                            disabled>← Попереднє</button>
+                        <button id="nextQuestion"
+                            class="px-8 py-4 bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-white font-semibold rounded-2xl transition-all duration-300 shadow-lg hover:shadow-xl">Наступне
+                            →</button>
+                        <button id="submitQuiz"
+                            class="px-8 py-4 bg-gradient-to-r from-accent to-primary hover:from-accent/90 hover:to-primary/90 text-white font-semibold rounded-2xl transition-all duration-300 shadow-lg hover:shadow-xl animate-pulse-glow"
+                            style="display: none;">
                             🎯 Завершити тест і отримати результати
                         </button>
                     </div>
@@ -366,27 +429,6 @@
     </div>
 
     <script src="script.js"></script>
-    <!-- Added time update script -->
-    <script>
-        function updateTime() {
-            const now = new Date();
-            const timeString = now.toLocaleTimeString('uk-UA', {
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-            const dateString = now.toLocaleDateString('uk-UA', {
-                weekday: 'long',
-                day: 'numeric',
-                month: 'long'
-            });
-            const timeElement = document.getElementById('currentTime');
-            if (timeElement) {
-                timeElement.textContent = `${timeString} • ${dateString}`;
-            }
-        }
-        updateTime();
-        setInterval(updateTime, 60000);
-    </script>
 </body>
 
 </html>

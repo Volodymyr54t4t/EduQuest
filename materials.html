@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="uk">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Матеріали для підготовки - НМТ Платформа</title>
+    <link rel="stylesheet" href="materials.css">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-graduation-cap"></i>
+                    <span>НМТ Матеріали</span>
+                </div>
+                <nav class="nav">
+                    <a href="index.html" class="nav-link">
+                        <i class="fas fa-home"></i>
+                        Головна
+                    </a>
+                    <a href="materials.html" class="nav-link active">
+                        <i class="fas fa-book"></i>
+                        Матеріали
+                    </a>
+                    <a href="admin.html" class="nav-link">
+                        <i class="fas fa-cog"></i>
+                        Адмін
+                    </a>
+                </nav>
+            </div>
+        </header>
+
+        <main class="main">
+
+            <div class="page-header">
+                <h1 class="page-title">Навчальні матеріали</h1>
+                <p class="page-subtitle">Знайдіть всі необхідні матеріали для підготовки до НМТ</p>
+            </div>
+
+
+            <div class="controls">
+                <div class="search-container">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" id="searchInput" placeholder="Пошук матеріалів..." class="search-input">
+                </div>
+
+                <div class="filter-container">
+                    <select id="subjectFilter" class="filter-select">
+                        <option value="all">Всі предмети</option>
+                        <option value="ukrainian">Українська мова</option>
+                        <option value="math">Математика</option>
+                        <option value="history">Історія України</option>
+                        <option value="english">Англійська мова</option>
+                        <option value="biology">Біологія</option>
+                        <option value="chemistry">Хімія</option>
+                        <option value="physics">Фізика</option>
+                        <option value="geography">Географія</option>
+                    </select>
+                </div>
+
+                <div class="sort-container">
+                    <select id="sortSelect" class="sort-select">
+                        <option value="name">За назвою</option>
+                        <option value="date">За датою</option>
+                        <option value="subject">За предметом</option>
+                        <option value="type">За типом</option>
+                    </select>
+                </div>
+
+                <button class="add-material-btn" onclick="openAddModal()">
+                    <i class="fas fa-plus"></i>
+                    Додати матеріал
+                </button>
+            </div>
+
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-book"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-number" id="totalMaterials">0</div>
+                        <div class="stat-label">Всього матеріалів</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-file-pdf"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-number" id="pdfCount">0</div>
+                        <div class="stat-label">PDF файлів</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-video"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-number" id="videoCount">0</div>
+                        <div class="stat-label">Відео уроків</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon">
+                        <i class="fas fa-question-circle"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-number" id="testCount">0</div>
+                        <div class="stat-label">Тестів</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="materials-grid" id="materialsGrid">
+                Materials will be populated by JavaScript
+            </div>
+
+            <div class="empty-state" id="emptyState" style="display: none;">
+                <div class="empty-icon">
+                    <i class="fas fa-search"></i>
+                </div>
+                <h3>Матеріали не знайдено</h3>
+                <p>Спробуйте змінити критерії пошуку або фільтри</p>
+            </div>
+        </main>
+    </div>
+
+    <div class="modal" id="addModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Додати новий матеріал</h2>
+                <button class="close-btn" onclick="closeAddModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form class="modal-form" id="addMaterialForm">
+                <div class="form-group">
+                    <label for="materialTitle">Назва матеріалу</label>
+                    <input type="text" id="materialTitle" required>
+                </div>
+                <div class="form-group">
+                    <label for="materialSubject">Предмет</label>
+                    <select id="materialSubject" required>
+                        <option value="">Оберіть предмет</option>
+                        <option value="ukrainian">Українська мова</option>
+                        <option value="math">Математика</option>
+                        <option value="history">Історія України</option>
+                        <option value="english">Англійська мова</option>
+                        <option value="biology">Біологія</option>
+                        <option value="chemistry">Хімія</option>
+                        <option value="physics">Фізика</option>
+                        <option value="geography">Географія</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="materialType">Тип матеріалу</label>
+                    <select id="materialType" required>
+                        <option value="">Оберіть тип</option>
+                        <option value="pdf">PDF документ</option>
+                        <option value="video">Відео урок</option>
+                        <option value="test">Тест</option>
+                        <option value="presentation">Презентація</option>
+                        <option value="article">Стаття</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="materialDescription">Опис</label>
+                    <textarea id="materialDescription" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="materialFile">Файл або посилання</label>
+                    <input type="text" id="materialFile" placeholder="URL або назва файлу">
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="closeAddModal()">Скасувати</button>
+                    <button type="submit" class="btn-primary">Додати матеріал</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="materials.js"></script>
+</body>
+
+</html>
