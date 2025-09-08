@@ -1,3 +1,5 @@
+/* global Quill, katex, renderMathInElement */
+
 class AdminPanel {
   constructor() {
     this.token = localStorage.getItem("adminToken");
@@ -7,11 +9,14 @@ class AdminPanel {
   }
 
   init() {
+    console.log("[v0] Initializing admin panel");
     this.setupEventListeners();
 
     if (this.token) {
       this.showAdminPanel();
       this.loadDashboard();
+      this.loadUsers();
+      this.loadQuizzes();
     } else {
       this.showLoginModal();
     }
@@ -53,10 +58,22 @@ class AdminPanel {
     });
 
     // Add question button
-    document.getElementById("addQuestion").addEventListener("click", () => {
-      const questionType = document.getElementById("questionType").value;
-      this.addQuestion(questionType);
-    });
+    const addQuestionBtn = document.getElementById("addQuestion");
+    if (addQuestionBtn) {
+      console.log("[v0] Add question button found, attaching event listener");
+      addQuestionBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        console.log("[v0] Add question button clicked");
+        const questionTypeSelect = document.getElementById("questionType");
+        const questionType = questionTypeSelect
+          ? questionTypeSelect.value
+          : "single";
+        console.log("[v0] Question type:", questionType);
+        this.addQuestion(questionType);
+      });
+    } else {
+      console.error("[v0] Add question button not found!");
+    }
 
     // Modal close buttons
     document.querySelectorAll(".close").forEach((closeBtn) => {
@@ -825,9 +842,16 @@ class AdminPanel {
   }
 
   addQuestion(type = "single") {
+    console.log("[v0] Adding question of type:", type);
     const container = document.getElementById("questionsContainer");
+    if (!container) {
+      console.error("[v0] Questions container not found!");
+      return;
+    }
+
     this.questionCounter++;
     const questionNumber = this.questionCounter;
+    console.log("[v0] Question number:", questionNumber);
 
     const questionDiv = document.createElement("div");
     questionDiv.className = "question-item";
@@ -841,6 +865,35 @@ class AdminPanel {
           <span class="question-type-badge">${this.getQuestionTypeName(
             type
           )}</span>
+          <select class="question-type-changer" onchange="adminPanel.changeQuestionType(${questionNumber}, this.value)">
+            <option value="single" ${
+              type === "single" ? "selected" : ""
+            }>Одна правильна відповідь</option>
+            <option value="multiple" ${
+              type === "multiple" ? "selected" : ""
+            }>Декілька правильних відповідей</option>
+            <option value="matching" ${
+              type === "matching" ? "selected" : ""
+            }>Встановлення відповідності</option>
+            <option value="ordering" ${
+              type === "ordering" ? "selected" : ""
+            }>Послідовність</option>
+            <option value="short-answer" ${
+              type === "short-answer" ? "selected" : ""
+            }>Коротка відкрита відповідь</option>
+            <option value="single-image" ${
+              type === "single-image" ? "selected" : ""
+            }>З фотографією (одна)</option>
+            <option value="multiple-image" ${
+              type === "multiple-image" ? "selected" : ""
+            }>З фотографією (декілька)</option>
+            <option value="graph-table" ${
+              type === "graph-table" ? "selected" : ""
+            }>Завдання з графіками/таблицями</option>
+            <option value="text-based" ${
+              type === "text-based" ? "selected" : ""
+            }>Аналіз тексту</option>
+          </select>
         </div>
         <button type="button" class="remove-question" onclick="this.parentElement.parentElement.remove(); adminPanel.updateQuestionNumbers();">×</button>
       </div>
@@ -850,12 +903,23 @@ class AdminPanel {
       </div>
     `;
 
-    if (type.includes("image")) {
+    if (type === "text-based") {
+      questionHTML += `
+        <div class="form-group">
+          <label>Текст для аналізу:</label>
+          <textarea class="text-content" rows="6" placeholder="Введіть текст, який потрібно проаналізувати..."></textarea>
+        </div>
+      `;
+    }
+
+    if (type.includes("image") || type === "graph-table") {
       questionHTML += `
         <div class="image-upload-section">
           <input type="file" class="image-upload-input" accept="image/*" onchange="adminPanel.handleImageUpload(this, ${questionNumber})">
           <button type="button" class="image-upload-button" onclick="this.previousElementSibling.click()">
-            📷 Додати зображення
+            📷 Додати ${
+              type === "graph-table" ? "графік/таблицю" : "зображення"
+            }
           </button>
           <div class="image-preview" style="display: none;">
             <img src="/placeholder.svg" alt="Question image" onclick="adminPanel.previewImage(this.src)">
@@ -874,21 +938,35 @@ class AdminPanel {
       case "multiple-image":
         questionHTML += this.createMultipleChoiceOptions(questionNumber);
         break;
-      case "text-input":
-        questionHTML += this.createTextInputOptions(questionNumber);
+      case "matching":
+        questionHTML += this.createMatchingOptions(questionNumber);
         break;
-      case "true-false":
-        questionHTML += this.createTrueFalseOptions(questionNumber);
+      case "ordering":
+        questionHTML += this.createOrderingOptions(questionNumber);
+        break;
+      case "short-answer":
+        questionHTML += this.createShortAnswerOptions(questionNumber);
+        break;
+      case "graph-table":
+        questionHTML += this.createGraphTableOptions(questionNumber);
+        break;
+      case "text-based":
+        questionHTML += this.createTextBasedOptions(questionNumber);
         break;
     }
 
     questionDiv.innerHTML = questionHTML;
     container.appendChild(questionDiv);
+
+    questionDiv.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
+    console.log("[v0] Question added successfully:", questionNumber);
   }
 
   createSingleChoiceOptions(questionNumber) {
     return `
       <div class="options-container">
+        <h4>Варіанти відповідей (одна правильна):</h4>
         ${[0, 1, 2, 3]
           .map(
             (index) => `
@@ -909,17 +987,14 @@ class AdminPanel {
   createMultipleChoiceOptions(questionNumber) {
     return `
       <div class="options-container">
-        <div class="form-group">
-          <label style="font-size: 0.875rem; color: var(--text-secondary);">
-            ✓ Оберіть всі правильні варіанти:
-          </label>
-        </div>
+        <h4>Варіанти відповідей (декілька правильних):</h4>
+        <p class="instruction">Відмітьте всі правильні варіанти:</p>
         ${[0, 1, 2, 3]
           .map(
             (index) => `
           <div class="option-group">
             <div class="option-letter">${String.fromCharCode(65 + index)}</div>
-            <input type="checkbox" name="correct_${questionNumber}" value="${index}">
+            <input type="checkbox" name="correct_${questionNumber}_${index}" value="${index}">
             <input type="text" class="option-text" placeholder="Варіант ${
               index + 1
             }" required>
@@ -931,126 +1006,328 @@ class AdminPanel {
     `;
   }
 
-  createTextInputOptions(questionNumber) {
+  changeQuestionType(questionNumber, newType) {
+    const questionDiv = document.querySelector(
+      `[data-question-id="${questionNumber}"]`
+    );
+    if (!questionDiv) return;
+
+    // Save current question text and text content
+    const questionText = questionDiv.querySelector(".question-text").value;
+    const textContent = questionDiv.querySelector(".text-content")?.value || "";
+
+    // Update question type
+    questionDiv.dataset.questionType = newType;
+
+    // Update type badge
+    const badge = questionDiv.querySelector(".question-type-badge");
+    badge.textContent = this.getQuestionTypeName(newType);
+
+    // Remove existing options container
+    const existingOptions = questionDiv.querySelector(
+      ".options-container, .matching-container, .ordering-container, .short-answer-container, .graph-table-container, .text-based-container"
+    );
+    if (existingOptions) {
+      existingOptions.remove();
+    }
+
+    // Remove existing image section if not needed
+    const imageSection = questionDiv.querySelector(".image-upload-section");
+    if (
+      imageSection &&
+      !newType.includes("image") &&
+      newType !== "graph-table"
+    ) {
+      imageSection.remove();
+    }
+
+    // Remove existing text content section if not needed
+    const textContentSection =
+      questionDiv.querySelector(".text-content")?.parentElement;
+    if (textContentSection && newType !== "text-based") {
+      textContentSection.remove();
+    }
+
+    // Add new sections based on type
+    let newHTML = "";
+
+    // Add text content section for text-based questions
+    if (
+      newType === "text-based" &&
+      !questionDiv.querySelector(".text-content")
+    ) {
+      newHTML += `
+        <div class="form-group">
+          <label>Текст для аналізу:</label>
+          <textarea class="text-content" rows="6" placeholder="Введіть текст, який потрібно проаналізувати...">${textContent}</textarea>
+        </div>
+      `;
+    }
+
+    // Add image section for image-based and graph-table questions
+    if (
+      (newType.includes("image") || newType === "graph-table") &&
+      !questionDiv.querySelector(".image-upload-section")
+    ) {
+      newHTML += `
+        <div class="image-upload-section">
+          <input type="file" class="image-upload-input" accept="image/*" onchange="adminPanel.handleImageUpload(this, ${questionNumber})">
+          <button type="button" class="image-upload-button" onclick="this.previousElementSibling.click()">
+            📷 Додати ${
+              newType === "graph-table" ? "графік/таблицю" : "зображення"
+            }
+          </button>
+          <div class="image-preview" style="display: none;">
+            <img src="/placeholder.svg" alt="Question image" onclick="adminPanel.previewImage(this.src)">
+            <button type="button" class="image-remove" onclick="adminPanel.removeImage(${questionNumber})">×</button>
+          </div>
+        </div>
+      `;
+    }
+
+    // Add appropriate options based on new type
+    switch (newType) {
+      case "single":
+      case "single-image":
+        newHTML += this.createSingleChoiceOptions(questionNumber);
+        break;
+      case "multiple":
+      case "multiple-image":
+        newHTML += this.createMultipleChoiceOptions(questionNumber);
+        break;
+      case "matching":
+        newHTML += this.createMatchingOptions(questionNumber);
+        break;
+      case "ordering":
+        newHTML += this.createOrderingOptions(questionNumber);
+        break;
+      case "short-answer":
+        newHTML += this.createShortAnswerOptions(questionNumber);
+        break;
+      case "graph-table":
+        newHTML += this.createGraphTableOptions(questionNumber);
+        break;
+      case "text-based":
+        newHTML += this.createTextBasedOptions(questionNumber);
+        break;
+    }
+
+    // Insert new HTML after the question text
+    const questionTextGroup = questionDiv.querySelector(".form-group");
+    questionTextGroup.insertAdjacentHTML("afterend", newHTML);
+
+    // Restore question text
+    questionDiv.querySelector(".question-text").value = questionText;
+  }
+
+  createMatchingOptions(questionNumber) {
     return `
-      <div class="form-group">
-        <label>Правильна відповідь:</label>
-        <input type="text" class="text-answer-input" placeholder="Введіть правильну відповідь..." required>
-        <div class="text-answer-keywords">
-          <small>Підказка: Можна вказати кілька варіантів через кому (наприклад: "Київ, київ, КИЇВ")</small>
+      <div class="matching-container">
+        <h4>Встановлення відповідності</h4>
+        <div class="matching-pairs">
+          <div class="matching-column">
+            <label>Ліва колонка:</label>
+            ${[0, 1, 2, 3]
+              .map(
+                (index) => `
+              <div class="matching-item">
+                <span class="item-number">${index + 1}.</span>
+                <input type="text" class="left-item" placeholder="Елемент ${
+                  index + 1
+                }" required>
+              </div>
+            `
+              )
+              .join("")}
+          </div>
+          <div class="matching-column">
+            <label>Права колонка:</label>
+            ${[0, 1, 2, 3]
+              .map(
+                (index) => `
+              <div class="matching-item">
+                <span class="item-letter">${String.fromCharCode(
+                  65 + index
+                )}.</span>
+                <input type="text" class="right-item" placeholder="Відповідь ${String.fromCharCode(
+                  65 + index
+                )}" required>
+                <select class="correct-match" required>
+                  <option value="">Відповідає...</option>
+                  <option value="0">1</option>
+                  <option value="1">2</option>
+                  <option value="2">3</option>
+                  <option value="3">4</option>
+                </select>
+              </div>
+            `
+              )
+              .join("")}
+          </div>
         </div>
       </div>
     `;
   }
 
-  createTrueFalseOptions(questionNumber) {
+  createOrderingOptions(questionNumber) {
     return `
-      <div class="true-false-options">
-        <div class="true-false-option" onclick="adminPanel.selectTrueFalse(this, ${questionNumber}, true)">
-          <input type="radio" name="correct_${questionNumber}" value="true" required>
-          ✅ Правда
-        </div>
-        <div class="true-false-option" onclick="adminPanel.selectTrueFalse(this, ${questionNumber}, false)">
-          <input type="radio" name="correct_${questionNumber}" value="false">
-          ❌ Неправда
+      <div class="ordering-container">
+        <h4>Встановлення послідовності</h4>
+        <p class="instruction">Введіть елементи у правильному порядку:</p>
+        <div class="ordering-items">
+          ${[0, 1, 2, 3, 4]
+            .map(
+              (index) => `
+            <div class="ordering-item">
+              <span class="order-number">${index + 1}.</span>
+              <input type="text" class="order-item" placeholder="Крок ${
+                index + 1
+              }" required>
+              <button type="button" class="move-up" onclick="adminPanel.moveOrderItem(this, 'up')" ${
+                index === 0 ? "disabled" : ""
+              }>↑</button>
+              <button type="button" class="move-down" onclick="adminPanel.moveOrderItem(this, 'down')" ${
+                index === 4 ? "disabled" : ""
+              }>↓</button>
+            </div>
+          `
+            )
+            .join("")}
         </div>
       </div>
     `;
+  }
+
+  createShortAnswerOptions(questionNumber) {
+    return `
+      <div class="short-answer-container">
+        <h4>Коротка відкрита відповідь</h4>
+        <div class="form-group">
+          <label>Правильна відповідь (або кілька варіантів через кому):</label>
+          <input type="text" class="short-answer-correct" placeholder="Наприклад: Київ, столиця України" required>
+        </div>
+        <div class="form-group">
+          <label>Максимальна кількість символів:</label>
+          <input type="number" class="max-length" value="100" min="10" max="500">
+        </div>
+        <div class="form-group">
+          <label>
+            <input type="checkbox" class="case-sensitive"> Враховувати регістр
+          </label>
+        </div>
+      </div>
+    `;
+  }
+
+  createGraphTableOptions(questionNumber) {
+    return `
+      <div class="graph-table-container">
+        <h4>Завдання з графіками/таблицями</h4>
+        <div class="form-group">
+          <label>Тип завдання:</label>
+          <select class="graph-table-type">
+            <option value="graph">Графік</option>
+            <option value="table">Таблиця</option>
+            <option value="chart">Діаграма</option>
+            <option value="map">Карта</option>
+          </select>
+        </div>
+        <div class="options-container">
+          ${[0, 1, 2, 3]
+            .map(
+              (index) => `
+            <div class="option-group">
+              <div class="option-letter">${String.fromCharCode(
+                65 + index
+              )}</div>
+              <input type="radio" name="correct_${questionNumber}" value="${index}" required>
+              <input type="text" class="option-text" placeholder="Варіант ${
+                index + 1
+              }" required>
+            </div>
+          `
+            )
+            .join("")}
+        </div>
+      </div>
+    `;
+  }
+
+  createTextBasedOptions(questionNumber) {
+    return `
+      <div class="text-based-container">
+        <h4>Аналіз тексту</h4>
+        <div class="form-group">
+          <label>Тип аналізу:</label>
+          <select class="text-analysis-type">
+            <option value="comprehension">Розуміння змісту</option>
+            <option value="grammar">Граматичний аналіз</option>
+            <option value="style">Стилістичний аналіз</option>
+            <option value="literary">Літературний аналіз</option>
+          </select>
+        </div>
+        <div class="options-container">
+          ${[0, 1, 2, 3]
+            .map(
+              (index) => `
+            <div class="option-group">
+              <div class="option-letter">${String.fromCharCode(
+                65 + index
+              )}</div>
+              <input type="radio" name="correct_${questionNumber}" value="${index}" required>
+              <input type="text" class="option-text" placeholder="Варіант ${
+                index + 1
+              }" required>
+            </div>
+          `
+            )
+            .join("")}
+        </div>
+      </div>
+    `;
+  }
+
+  moveOrderItem(button, direction) {
+    const item = button.closest(".ordering-item");
+    const container = item.parentElement;
+
+    if (direction === "up" && item.previousElementSibling) {
+      container.insertBefore(item, item.previousElementSibling);
+    } else if (direction === "down" && item.nextElementSibling) {
+      container.insertBefore(item.nextElementSibling, item);
+    }
+
+    // Update order numbers and button states
+    this.updateOrderNumbers(container);
+  }
+
+  updateOrderNumbers(container) {
+    const items = container.querySelectorAll(".ordering-item");
+    items.forEach((item, index) => {
+      const numberSpan = item.querySelector(".order-number");
+      numberSpan.textContent = `${index + 1}.`;
+
+      const upBtn = item.querySelector(".move-up");
+      const downBtn = item.querySelector(".move-down");
+
+      upBtn.disabled = index === 0;
+      downBtn.disabled = index === items.length - 1;
+    });
   }
 
   getQuestionTypeName(type) {
     const types = {
       single: "Одна відповідь",
       multiple: "Декілька відповідей",
+      matching: "Відповідність",
+      ordering: "Послідовність",
+      "short-answer": "Коротка відповідь",
       "single-image": "З фото (одна)",
       "multiple-image": "З фото (декілька)",
-      "text-input": "Текстова",
-      "true-false": "Правда/Неправда",
+      "graph-table": "Графік/Таблиця",
+      "text-based": "Аналіз тексту",
     };
-    return types[type] || "Невідомий тип";
-  }
-
-  handleImageUpload(input, questionNumber) {
-    const file = input.files[0];
-    if (!file) return;
-
-    if (file.size > 5 * 1024 * 1024) {
-      this.showNotification(
-        "Розмір файлу не повинен перевищувати 5MB",
-        "error"
-      );
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const questionDiv = document.querySelector(
-        `[data-question-id="${questionNumber}"]`
-      );
-      const imageSection = questionDiv.querySelector(".image-upload-section");
-      const preview = imageSection.querySelector(".image-preview");
-      const img = preview.querySelector("img");
-
-      img.src = e.target.result;
-      preview.style.display = "block";
-      imageSection.classList.add("has-image");
-
-      questionDiv.dataset.imageData = e.target.result;
-    };
-    reader.readAsDataURL(file);
-  }
-
-  removeImage(questionNumber) {
-    const questionDiv = document.querySelector(
-      `[data-question-id="${questionNumber}"]`
-    );
-    const imageSection = questionDiv.querySelector(".image-upload-section");
-    const preview = imageSection.querySelector(".image-preview");
-    const input = imageSection.querySelector(".image-upload-input");
-
-    preview.style.display = "none";
-    imageSection.classList.remove("has-image");
-    input.value = "";
-    delete questionDiv.dataset.imageData;
-  }
-
-  previewImage(src) {
-    document.getElementById("previewImage").src = src;
-    document.getElementById("imagePreviewModal").style.display = "flex";
-  }
-
-  selectTrueFalse(element, questionNumber, value) {
-    const container = element.parentElement;
-    container.querySelectorAll(".true-false-option").forEach((opt) => {
-      opt.classList.remove("selected");
-    });
-    element.classList.add("selected");
-    element.querySelector('input[type="radio"]').checked = true;
-  }
-
-  updateQuestionNumbers() {
-    const questions = document.querySelectorAll(".question-item");
-    questions.forEach((question, index) => {
-      const questionNumber = index + 1;
-      question.querySelector(
-        ".question-number"
-      ).textContent = `Питання ${questionNumber}`;
-      question.dataset.questionId = questionNumber;
-
-      const radios = question.querySelectorAll('input[type="radio"]');
-      radios.forEach((radio) => {
-        if (radio.name.startsWith("correct_")) {
-          radio.name = `correct_${questionNumber}`;
-        }
-      });
-
-      const checkboxes = question.querySelectorAll('input[type="checkbox"]');
-      checkboxes.forEach((checkbox) => {
-        if (checkbox.name.startsWith("correct_")) {
-          checkbox.name = `correct_${questionNumber}`;
-        }
-      });
-    });
+    return types[type] || type;
   }
 
   async createQuiz() {
@@ -1061,14 +1338,18 @@ class AdminPanel {
     const timeLimit = document.getElementById("quizTimeLimit").value;
     const passingScore = document.getElementById("quizPassingScore").value;
 
-    const questions = [];
+    if (!title.trim()) {
+      this.showNotification("Будь ласка, введіть назву тесту", "error");
+      return;
+    }
+
     const questionItems = document.querySelectorAll(".question-item");
+    const questions = [];
 
     for (let i = 0; i < questionItems.length; i++) {
       const item = questionItems[i];
       const questionType = item.dataset.questionType;
       const questionText = item.querySelector(".question-text").value;
-      const imageData = item.dataset.imageData || null;
 
       if (!questionText.trim()) {
         this.showNotification(
@@ -1079,15 +1360,36 @@ class AdminPanel {
       }
 
       const questionData = {
-        id: i + 1,
         question: questionText,
         type: questionType,
-        image: imageData,
+        image: null,
       };
+
+      if (questionType === "text-based") {
+        const textContent = item.querySelector(".text-content")?.value;
+        if (!textContent?.trim()) {
+          this.showNotification(
+            `Будь ласка, введіть текст для аналізу для питання ${i + 1}`,
+            "error"
+          );
+          return;
+        }
+        questionData.textContent = textContent;
+        questionData.analysisType =
+          item.querySelector(".text-analysis-type")?.value || "comprehension";
+      }
+
+      // Handle image upload
+      const imagePreview = item.querySelector(".image-preview img");
+      if (imagePreview && imagePreview.src !== "/placeholder.svg") {
+        questionData.image = imagePreview.src;
+      }
 
       switch (questionType) {
         case "single":
         case "single-image":
+        case "graph-table":
+        case "text-based":
           const singleOptions = Array.from(
             item.querySelectorAll(".option-text")
           ).map((input) => input.value);
@@ -1105,6 +1407,11 @@ class AdminPanel {
 
           questionData.options = singleOptions;
           questionData.correct = Number.parseInt(singleCorrectRadio.value);
+
+          if (questionType === "graph-table") {
+            questionData.graphTableType =
+              item.querySelector(".graph-table-type")?.value || "graph";
+          }
           break;
 
         case "multiple":
@@ -1135,9 +1442,60 @@ class AdminPanel {
           );
           break;
 
-        case "text-input":
-          const textAnswer = item.querySelector(".text-answer-input").value;
-          if (!textAnswer.trim()) {
+        case "matching":
+          const leftItems = Array.from(item.querySelectorAll(".left-item")).map(
+            (input) => input.value
+          );
+          const rightItems = Array.from(
+            item.querySelectorAll(".right-item")
+          ).map((input) => input.value);
+          const correctMatches = Array.from(
+            item.querySelectorAll(".correct-match")
+          ).map((select) => Number.parseInt(select.value));
+
+          if (
+            leftItems.some((item) => !item.trim()) ||
+            rightItems.some((item) => !item.trim()) ||
+            correctMatches.some((match) => isNaN(match))
+          ) {
+            this.showNotification(
+              `Будь ласка, заповніть всі поля відповідності для питання ${
+                i + 1
+              }`,
+              "error"
+            );
+            return;
+          }
+
+          questionData.leftItems = leftItems;
+          questionData.rightItems = rightItems;
+          questionData.correctMatches = correctMatches;
+          break;
+
+        case "ordering":
+          const orderItems = Array.from(
+            item.querySelectorAll(".order-item")
+          ).map((input) => input.value);
+
+          if (orderItems.some((item) => !item.trim())) {
+            this.showNotification(
+              `Будь ласка, заповніть всі елементи послідовності для питання ${
+                i + 1
+              }`,
+              "error"
+            );
+            return;
+          }
+
+          questionData.correctOrder = orderItems;
+          break;
+
+        case "short-answer":
+          const shortAnswer = item.querySelector(".short-answer-correct").value;
+          const maxLength = item.querySelector(".max-length").value;
+          const caseSensitive = item.querySelector(".case-sensitive").checked;
+
+          if (!shortAnswer.trim()) {
             this.showNotification(
               `Будь ласка, введіть правильну відповідь для питання ${i + 1}`,
               "error"
@@ -1145,24 +1503,11 @@ class AdminPanel {
             return;
           }
 
-          questionData.correctAnswer = textAnswer
+          questionData.correctAnswers = shortAnswer
             .split(",")
             .map((ans) => ans.trim());
-          break;
-
-        case "true-false":
-          const trueFalseRadio = item.querySelector(
-            'input[type="radio"]:checked'
-          );
-          if (!trueFalseRadio) {
-            this.showNotification(
-              `Будь ласка, оберіть правильну відповідь для питання ${i + 1}`,
-              "error"
-            );
-            return;
-          }
-
-          questionData.correct = trueFalseRadio.value === "true";
+          questionData.maxLength = Number.parseInt(maxLength) || 100;
+          questionData.caseSensitive = caseSensitive;
           break;
       }
 
@@ -1379,3 +1724,547 @@ const notificationStyles = `
 const styleSheet = document.createElement("style");
 styleSheet.textContent = notificationStyles;
 document.head.appendChild(styleSheet);
+
+// Global variables for editors
+const quillEditors = new Map();
+let currentMathEditor = null;
+
+// Math symbols database
+const mathSymbols = {
+  basic: [
+    { symbol: "+", latex: "+", name: "Додавання" },
+    { symbol: "−", latex: "-", name: "Віднімання" },
+    { symbol: "×", latex: "\\times", name: "Множення" },
+    { symbol: "÷", latex: "\\div", name: "Ділення" },
+    { symbol: "=", latex: "=", name: "Дорівнює" },
+    { symbol: "≠", latex: "\\neq", name: "Не дорівнює" },
+    { symbol: "≈", latex: "\\approx", name: "Приблизно дорівнює" },
+    { symbol: "<", latex: "<", name: "Менше" },
+    { symbol: ">", latex: ">", name: "Більше" },
+    { symbol: "≤", latex: "\\leq", name: "Менше або дорівнює" },
+    { symbol: "≥", latex: "\\geq", name: "Більше або дорівнює" },
+    { symbol: "±", latex: "\\pm", name: "Плюс-мінус" },
+  ],
+  fractions: [
+    { symbol: "½", latex: "\\frac{1}{2}", name: "Одна друга" },
+    { symbol: "⅓", latex: "\\frac{1}{3}", name: "Одна третя" },
+    { symbol: "¼", latex: "\\frac{1}{4}", name: "Одна четверта" },
+    { symbol: "¾", latex: "\\frac{3}{4}", name: "Три четвертих" },
+    { symbol: "a/b", latex: "\\frac{a}{b}", name: "Звичайний дріб" },
+    {
+      symbol: "a/b/c",
+      latex: "\\frac{\\frac{a}{b}}{c}",
+      name: "Складний дріб",
+    },
+  ],
+  powers: [
+    { symbol: "x²", latex: "x^2", name: "Квадрат" },
+    { symbol: "x³", latex: "x^3", name: "Куб" },
+    { symbol: "xⁿ", latex: "x^n", name: "Степінь" },
+    { symbol: "x₁", latex: "x_1", name: "Індекс" },
+    { symbol: "aⁿ", latex: "a^n", name: "Степінь a" },
+    { symbol: "10⁶", latex: "10^6", name: "Мільйон" },
+  ],
+  roots: [
+    { symbol: "√", latex: "\\sqrt{x}", name: "Квадратний корінь" },
+    { symbol: "∛", latex: "\\sqrt[3]{x}", name: "Кубічний корінь" },
+    { symbol: "ⁿ√", latex: "\\sqrt[n]{x}", name: "Корінь n-го степеня" },
+  ],
+  geometry: [
+    { symbol: "∠", latex: "\\angle", name: "Кут" },
+    { symbol: "°", latex: "^\\circ", name: "Градус" },
+    { symbol: "△", latex: "\\triangle", name: "Трикутник" },
+    { symbol: "□", latex: "\\square", name: "Квадрат" },
+    { symbol: "○", latex: "\\circ", name: "Коло" },
+    { symbol: "∥", latex: "\\parallel", name: "Паралельно" },
+    { symbol: "⊥", latex: "\\perp", name: "Перпендикулярно" },
+    { symbol: "≅", latex: "\\cong", name: "Конгруентно" },
+    { symbol: "∼", latex: "\\sim", name: "Подібно" },
+  ],
+  calculus: [
+    { symbol: "∫", latex: "\\int", name: "Інтеграл" },
+    { symbol: "∑", latex: "\\sum", name: "Сума" },
+    { symbol: "∏", latex: "\\prod", name: "Добуток" },
+    { symbol: "∂", latex: "\\partial", name: "Частинна похідна" },
+    { symbol: "∞", latex: "\\infty", name: "Нескінченність" },
+    { symbol: "lim", latex: "\\lim", name: "Границя" },
+    { symbol: "Δ", latex: "\\Delta", name: "Дельта" },
+    { symbol: "α", latex: "\\alpha", name: "Альфа" },
+    { symbol: "β", latex: "\\beta", name: "Бета" },
+    { symbol: "γ", latex: "\\gamma", name: "Гамма" },
+    { symbol: "π", latex: "\\pi", name: "Пі" },
+    { symbol: "θ", latex: "\\theta", name: "Тета" },
+  ],
+};
+
+// Initialize rich text editors
+function initializeRichTextEditor(containerId, placeholder = "") {
+  const toolbarOptions = [
+    ["bold", "italic", "underline", "strike"],
+    ["blockquote", "code-block"],
+    [{ header: 1 }, { header: 2 }],
+    [{ list: "ordered" }, { list: "bullet" }],
+    [{ script: "sub" }, { script: "super" }],
+    [{ indent: "-1" }, { indent: "+1" }],
+    [{ direction: "rtl" }],
+    [{ size: ["small", false, "large", "huge"] }],
+    [{ header: [1, 2, 3, 4, 5, 6, false] }],
+    [{ color: [] }, { background: [] }],
+    [{ font: [] }],
+    [{ align: [] }],
+    ["link", "image", "formula"],
+    ["clean"],
+  ];
+
+  const quill = new Quill(containerId, {
+    theme: "snow",
+    placeholder: placeholder,
+    modules: {
+      toolbar: {
+        container: toolbarOptions,
+        handlers: {
+          formula: function () {
+            openMathFormulaModal(this);
+          },
+          image: function () {
+            openImageUploadModal(this);
+          },
+        },
+      },
+    },
+  });
+
+  // Store editor reference
+  quillEditors.set(containerId, quill);
+
+  return quill;
+}
+
+// Initialize math formula modal
+function initializeMathFormulaModal() {
+  const modal = document.getElementById("mathFormulaModal");
+  const mathSymbolsContainer = document.getElementById("mathSymbols");
+  const mathPreview = document.getElementById("mathPreview");
+  const mathLatexInput = document.getElementById("mathLatexInput");
+  const insertBtn = document.getElementById("insertMathFormula");
+
+  // Category buttons
+  document.querySelectorAll(".math-cat-btn").forEach((btn) => {
+    btn.addEventListener("click", function () {
+      document
+        .querySelectorAll(".math-cat-btn")
+        .forEach((b) => b.classList.remove("active"));
+      this.classList.add("active");
+      loadMathSymbols(this.dataset.category);
+    });
+  });
+
+  // Load initial category
+  loadMathSymbols("basic");
+
+  // LaTeX input handler
+  mathLatexInput.addEventListener("input", function () {
+    updateMathPreview(this.value);
+  });
+
+  // Insert formula button
+  insertBtn.addEventListener("click", () => {
+    const latex = mathLatexInput.value.trim();
+    if (latex && currentMathEditor) {
+      insertMathFormula(currentMathEditor, latex);
+      closeMathFormulaModal();
+    }
+  });
+}
+
+// Load math symbols for category
+function loadMathSymbols(category) {
+  const container = document.getElementById("mathSymbols");
+  const symbols = mathSymbols[category] || [];
+
+  container.innerHTML = symbols
+    .map(
+      (symbol) => `
+        <div class="math-symbol" data-latex="${symbol.latex}" title="${symbol.name}">
+            ${symbol.symbol}
+        </div>
+    `
+    )
+    .join("");
+
+  // Add click handlers
+  container.querySelectorAll(".math-symbol").forEach((symbolEl) => {
+    symbolEl.addEventListener("click", function () {
+      const latex = this.dataset.latex;
+      document.getElementById("mathLatexInput").value = latex;
+      updateMathPreview(latex);
+    });
+  });
+}
+
+// Update math preview
+function updateMathPreview(latex) {
+  const preview = document.getElementById("mathPreview");
+  if (latex.trim()) {
+    try {
+      katex.render(latex, preview, {
+        throwOnError: false,
+        displayMode: true,
+      });
+    } catch (e) {
+      preview.innerHTML = `<span style="color: red;">Помилка: ${e.message}</span>`;
+    }
+  } else {
+    preview.innerHTML =
+      '<span style="color: #999;">Попередній перегляд з\'явиться тут</span>';
+  }
+}
+
+// Open math formula modal
+function openMathFormulaModal(editor) {
+  currentMathEditor = editor;
+  document.getElementById("mathFormulaModal").style.display = "block";
+  document.getElementById("mathLatexInput").value = "";
+  updateMathPreview("");
+}
+
+// Close math formula modal
+function closeMathFormulaModal() {
+  document.getElementById("mathFormulaModal").style.display = "none";
+  currentMathEditor = null;
+}
+
+// Insert math formula into editor
+function insertMathFormula(editor, latex) {
+  const range = editor.getSelection(true);
+  editor.insertEmbed(range.index, "formula", latex);
+  editor.setSelection(range.index + 1);
+}
+
+// Initialize image upload modal
+function initializeImageUploadModal() {
+  const modal = document.getElementById("imageUploadModal");
+  const fileInput = document.getElementById("imageFileInput");
+  const dropZone = document.getElementById("imageDropZone");
+  const previewContainer = document.getElementById("imagePreviewContainer");
+  const previewImage = document.getElementById("uploadImagePreview");
+  const confirmBtn = document.getElementById("confirmImageUpload");
+
+  const currentImageEditor = null;
+  let currentImageFile = null;
+
+  // File input handler
+  fileInput.addEventListener("change", (e) => {
+    if (e.target.files.length > 0) {
+      handleImageFile(e.target.files[0]);
+    }
+  });
+
+  // Drag and drop handlers
+  dropZone.addEventListener("dragover", function (e) {
+    e.preventDefault();
+    this.classList.add("dragover");
+  });
+
+  dropZone.addEventListener("dragleave", function (e) {
+    e.preventDefault();
+    this.classList.remove("dragover");
+  });
+
+  dropZone.addEventListener("drop", function (e) {
+    e.preventDefault();
+    this.classList.remove("dragover");
+
+    const files = e.dataTransfer.files;
+    if (files.length > 0 && files[0].type.startsWith("image/")) {
+      handleImageFile(files[0]);
+    }
+  });
+
+  // Click to select file
+  dropZone.addEventListener("click", () => {
+    fileInput.click();
+  });
+
+  // Confirm upload
+  confirmBtn.addEventListener("click", () => {
+    if (currentImageFile && currentImageEditor) {
+      uploadAndInsertImage(currentImageEditor, currentImageFile);
+    }
+  });
+
+  // Handle image file
+  function handleImageFile(file) {
+    if (!file.type.startsWith("image/")) {
+      alert("Будь ласка, виберіть файл зображення");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      // 5MB limit
+      alert("Розмір файлу не повинен перевищувати 5MB");
+      return;
+    }
+
+    currentImageFile = file;
+
+    // Show preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      previewImage.src = e.target.result;
+      document.getElementById("imageFileName").textContent = file.name;
+      document.getElementById("imageFileSize").textContent = formatFileSize(
+        file.size
+      );
+
+      dropZone.style.display = "none";
+      previewContainer.style.display = "block";
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // Upload and insert image
+  async function uploadAndInsertImage(editor, file) {
+    try {
+      confirmBtn.textContent = "Завантаження...";
+      confirmBtn.disabled = true;
+
+      const formData = new FormData();
+      formData.append("image", file);
+
+      const response = await fetch("/api/upload-image", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("adminToken")}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Помилка завантаження зображення");
+      }
+
+      const result = await response.json();
+
+      // Insert image into editor
+      const range = editor.getSelection(true);
+      editor.insertEmbed(range.index, "image", result.url);
+      editor.setSelection(range.index + 1);
+
+      closeImageUploadModal();
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      alert("Помилка завантаження зображення: " + error.message);
+    } finally {
+      confirmBtn.textContent = "Підтвердити завантаження";
+      confirmBtn.disabled = false;
+    }
+  }
+}
+
+function openImageUploadModal(editor) {
+  const modal = document.getElementById("imageUploadModal");
+  if (modal) {
+    // Set current editor reference
+    window.currentImageEditor = editor;
+    modal.style.display = "block";
+    resetImageUploadModal();
+  }
+}
+
+function closeImageUploadModal() {
+  const modal = document.getElementById("imageUploadModal");
+  if (modal) {
+    modal.style.display = "none";
+    window.currentImageEditor = null;
+    resetImageUploadModal();
+  }
+}
+
+function resetImageUploadModal() {
+  const dropZone = document.getElementById("imageDropZone");
+  const previewContainer = document.getElementById("imagePreviewContainer");
+  const fileInput = document.getElementById("imageFileInput");
+
+  if (dropZone) dropZone.style.display = "block";
+  if (previewContainer) previewContainer.style.display = "none";
+  if (fileInput) fileInput.value = "";
+  window.currentImageFile = null;
+}
+
+function generateMathCalculationAnswer(questionIndex) {
+  return `
+        <h4>Математичні обчислення:</h4>
+        <div class="math-calculation-section">
+            <div class="form-group">
+                <label>Правильна відповідь (число):</label>
+                <input type="number" class="math-calculation-answer" step="any" placeholder="Введіть числову відповідь" required>
+            </div>
+            <div class="form-group">
+                <label>Допустима похибка:</label>
+                <input type="number" class="calculation-tolerance" min="0" step="0.01" value="0.01" placeholder="0.01">
+            </div>
+            <div class="form-group">
+                <label>Одиниці вимірювання:</label>
+                <input type="text" class="calculation-units" placeholder="м, кг, с, тощо">
+            </div>
+        </div>
+    `;
+}
+
+function generateShortAnswer(questionIndex) {
+  return `
+        <h4>Коротка відкрита відповідь:</h4>
+        <div class="short-answer-section">
+            <div class="form-group">
+                <label>Правильна відповідь (або кілька варіантів через кому):</label>
+                <input type="text" class="short-answer-correct" placeholder="Наприклад: Київ, столиця України" required>
+            </div>
+            <div class="form-group">
+                <label>Максимальна кількість символів:</label>
+                <input type="number" class="max-length" value="100" min="10" max="500">
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" class="case-sensitive"> Враховувати регістр
+                </label>
+            </div>
+        </div>
+    `;
+}
+
+function generateMatchingAnswers(questionIndex) {
+  return `
+        <h4>Встановлення відповідності:</h4>
+        <div class="matching-section">
+            <div class="matching-pairs">
+                <div class="matching-column">
+                    <label>Ліва колонка:</label>
+                    ${[0, 1, 2, 3]
+                      .map(
+                        (index) => `
+                        <div class="matching-item">
+                            <span class="item-number">${index + 1}.</span>
+                            <input type="text" class="left-item" placeholder="Елемент ${
+                              index + 1
+                            }" required>
+                        </div>
+                    `
+                      )
+                      .join("")}
+                </div>
+                <div class="matching-column">
+                    <label>Права колонка:</label>
+                    ${[0, 1, 2, 3]
+                      .map(
+                        (index) => `
+                        <div class="matching-item">
+                            <span class="item-letter">${String.fromCharCode(
+                              65 + index
+                            )}.</span>
+                            <input type="text" class="right-item" placeholder="Відповідь ${String.fromCharCode(
+                              65 + index
+                            )}" required>
+                            <select class="correct-match" required>
+                                <option value="">Відповідає...</option>
+                                <option value="0">1</option>
+                                <option value="1">2</option>
+                                <option value="2">3</option>
+                                <option value="3">4</option>
+                            </select>
+                        </div>
+                    `
+                      )
+                      .join("")}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function generateOrderingAnswers(questionIndex) {
+  return `
+        <h4>Встановлення послідовності:</h4>
+        <div class="ordering-section">
+            <p class="instruction">Введіть елементи у правильному порядку:</p>
+            <div class="ordering-items">
+                ${[0, 1, 2, 3, 4]
+                  .map(
+                    (index) => `
+                    <div class="ordering-item">
+                        <span class="order-number">${index + 1}.</span>
+                        <input type="text" class="order-item" placeholder="Крок ${
+                          index + 1
+                        }" required>
+                        <button type="button" class="move-up" onclick="adminPanel.moveOrderItem(this, 'up')" ${
+                          index === 0 ? "disabled" : ""
+                        }>↑</button>
+                        <button type="button" class="move-down" onclick="adminPanel.moveOrderItem(this, 'down')" ${
+                          index === 4 ? "disabled" : ""
+                        }>↓</button>
+                    </div>
+                `
+                  )
+                  .join("")}
+            </div>
+        </div>
+    `;
+}
+
+// Format file size
+function formatFileSize(bytes) {
+  if (bytes === 0) return "0 Bytes";
+  const k = 1024;
+  const sizes = ["Bytes", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return (
+    Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
+  );
+}
+
+// Enhanced initialization
+document.addEventListener("DOMContentLoaded", () => {
+  // Initialize rich text editor for quiz description
+  setTimeout(() => {
+    const descEditor = initializeRichTextEditor(
+      "#quizDescriptionEditor",
+      "Введіть опис тесту..."
+    );
+
+    // Sync with hidden input
+    descEditor.on("text-change", () => {
+      document.getElementById("quizDescription").value =
+        descEditor.root.innerHTML;
+    });
+  }, 100);
+
+  // Initialize math formula modal
+  initializeMathFormulaModal();
+
+  // Initialize image upload modal
+  initializeImageUploadModal();
+
+  // Initialize KaTeX auto-render
+  if (typeof renderMathInElement !== "undefined") {
+    renderMathInElement(document.body, {
+      delimiters: [
+        { left: "$$", right: "$$", display: true },
+        { left: "$", right: "$", display: false },
+      ],
+    });
+  }
+
+  // Modal close handlers
+  document.querySelectorAll(".modal .close").forEach((closeBtn) => {
+    closeBtn.addEventListener("click", function () {
+      this.closest(".modal").style.display = "none";
+    });
+  });
+
+  // Close modals when clicking outside
+  window.addEventListener("click", (e) => {
+    if (e.target.classList.contains("modal")) {
+      e.target.style.display = "none";
+    }
+  });
+});

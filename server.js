@@ -3,6 +3,8 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { Pool } = require("pg");
 const path = require("path");
+const multer = require("multer");
+const fs = require("fs").promises;
 require("dotenv").config();
 
 const app = express();
@@ -16,10 +18,43 @@ const pool = new Pool({
   },
 });
 
+// Configure multer for image uploads
+const storage = multer.diskStorage({
+  destination: async (req, file, cb) => {
+    const uploadDir = path.join(__dirname, "uploads", "images");
+    try {
+      await fs.mkdir(uploadDir, { recursive: true });
+      cb(null, uploadDir);
+    } catch (error) {
+      cb(error);
+    }
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, "img-" + uniqueSuffix + path.extname(file.originalname));
+  },
+});
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Check if file is an image
+    if (file.mimetype.startsWith("image/")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only image files are allowed!"), false);
+    }
+  },
+});
+
 // Middleware
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use(express.static("."));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // JWT Secret
 const JWT_SECRET =
@@ -71,6 +106,33 @@ const requireAdmin = async (req, res, next) => {
   }
 };
 
+// Image upload endpoint
+app.post(
+  "/api/upload-image",
+  requireAdmin,
+  upload.single("image"),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "Файл не завантажено" });
+      }
+
+      // Return the URL path to the uploaded image
+      const imageUrl = `/uploads/images/${req.file.filename}`;
+
+      res.json({
+        success: true,
+        url: imageUrl,
+        filename: req.file.filename,
+        size: req.file.size,
+      });
+    } catch (error) {
+      console.error("Image upload error:", error);
+      res.status(500).json({ error: "Помилка завантаження зображення" });
+    }
+  }
+);
+
 async function initDatabase() {
   try {
     await pool.query(`CREATE TABLE IF NOT EXISTS users (
@@ -103,13 +165,47 @@ async function initDatabase() {
       difficulty VARCHAR(20) DEFAULT 'medium',
       time_limit INTEGER DEFAULT 60,
       passing_score INTEGER DEFAULT 60,
-      questions JSONB NOT NULL,
       times_taken INTEGER DEFAULT 0,
       average_score DECIMAL(5,2) DEFAULT 0,
       is_active BOOLEAN DEFAULT true,
       created_by INTEGER REFERENCES users(id),
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    await pool.query(`CREATE TABLE IF NOT EXISTS questions (
+      id SERIAL PRIMARY KEY,
+      quiz_id INTEGER REFERENCES quizzes(id) ON DELETE CASCADE,
+      question_text TEXT NOT NULL,
+      question_html TEXT,
+      question_type VARCHAR(50) DEFAULT 'single',
+      points INTEGER DEFAULT 1,
+      time_limit INTEGER DEFAULT 60,
+      explanation TEXT,
+      explanation_html TEXT,
+      question_order INTEGER DEFAULT 1,
+      is_active BOOLEAN DEFAULT true,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    await pool.query(`CREATE TABLE IF NOT EXISTS answers (
+      id SERIAL PRIMARY KEY,
+      question_id INTEGER REFERENCES questions(id) ON DELETE CASCADE,
+      answer_text TEXT NOT NULL,
+      answer_html TEXT,
+      is_correct BOOLEAN DEFAULT false,
+      answer_order INTEGER DEFAULT 1,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    await pool.query(`CREATE TABLE IF NOT EXISTS question_metadata (
+      id SERIAL PRIMARY KEY,
+      question_id INTEGER REFERENCES questions(id) ON DELETE CASCADE,
+      metadata_key VARCHAR(100) NOT NULL,
+      metadata_value TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`);
 
     await pool.query(`CREATE TABLE IF NOT EXISTS test_results (
@@ -127,6 +223,19 @@ async function initDatabase() {
       user_agent TEXT,
       completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`);
+
+    await pool.query(
+      `CREATE INDEX IF NOT EXISTS idx_questions_quiz_id ON questions(quiz_id)`
+    );
+    await pool.query(
+      `CREATE INDEX IF NOT EXISTS idx_answers_question_id ON answers(question_id)`
+    );
+    await pool.query(
+      `CREATE INDEX IF NOT EXISTS idx_questions_order ON questions(quiz_id, question_order)`
+    );
+    await pool.query(
+      `CREATE INDEX IF NOT EXISTS idx_answers_order ON answers(question_id, answer_order)`
+    );
 
     try {
       await pool.query(
@@ -373,14 +482,14 @@ app.post("/api/admin/login", async (req, res) => {
   try {
     const { password } = req.body;
 
-    console.log("[v0] Admin login attempt with password:", password);
+    console.log(" Admin login attempt with password:", password);
 
     // Check admin password (in production, use environment variable)
     const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "319560";
-    console.log("[v0] Expected admin password:", ADMIN_PASSWORD);
+    console.log(" Expected admin password:", ADMIN_PASSWORD);
 
     if (password !== ADMIN_PASSWORD) {
-      console.log("[v0] Password mismatch");
+      console.log(" Password mismatch");
       return res
         .status(401)
         .json({ success: false, message: "Невірний пароль" });
@@ -393,7 +502,7 @@ app.post("/api/admin/login", async (req, res) => {
 
     let admin;
     if (adminResult.rows.length === 0) {
-      console.log("[v0] No admin user found, creating default admin");
+      console.log(" No admin user found, creating default admin");
       const defaultAdminResult = await pool.query(
         "INSERT INTO users (email, first_name, last_name, role, password_hash) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, first_name, last_name, role",
         ["admin@nmt.gov.ua", "Адмін", "Користувач", "admin", "default_hash"]
@@ -409,7 +518,7 @@ app.post("/api/admin/login", async (req, res) => {
       { expiresIn: "24h" }
     );
 
-    console.log("[v0] Admin login successful, user:", admin);
+    console.log(" Admin login successful, user:", admin);
 
     res.json({
       success: true,
@@ -417,7 +526,7 @@ app.post("/api/admin/login", async (req, res) => {
       user: admin,
     });
   } catch (error) {
-    console.error("[v0] Admin login error:", error);
+    console.error(" Admin login error:", error);
     res
       .status(500)
       .json({ success: false, message: "Внутрішня помилка сервера" });
@@ -541,7 +650,11 @@ app.get("/api/quizzes/:id", async (req, res) => {
 });
 
 app.post("/api/admin/quizzes", requireAdmin, async (req, res) => {
+  const client = await pool.connect();
+
   try {
+    await client.query("BEGIN");
+
     const {
       title,
       description,
@@ -552,66 +665,294 @@ app.post("/api/admin/quizzes", requireAdmin, async (req, res) => {
       questions,
     } = req.body;
 
-    if (!title || !description || !questions || questions.length === 0) {
-      return res.status(400).json({ error: "Відсутні обов'язкові поля" });
-    }
-
-    const processedQuestions = questions.map((q, index) => {
-      const questionData = {
-        id: index + 1,
-        question: q.question,
-        type: q.type || "single",
-        image: q.image || null,
-      };
-
-      switch (q.type) {
-        case "single":
-        case "single-image":
-          questionData.options = q.options;
-          questionData.correct = q.correct;
-          break;
-        case "multiple":
-        case "multiple-image":
-          questionData.options = q.options;
-          questionData.correct = Array.isArray(q.correct)
-            ? q.correct
-            : [q.correct];
-          break;
-        case "text-input":
-          questionData.correctAnswer = Array.isArray(q.correctAnswer)
-            ? q.correctAnswer
-            : [q.correctAnswer];
-          break;
-        case "true-false":
-          questionData.correct = q.correct;
-          break;
-        default:
-          questionData.options = q.options;
-          questionData.correct = q.correct;
-      }
-
-      return questionData;
-    });
-
-    const result = await pool.query(
-      `INSERT INTO quizzes (title, description, category, difficulty, time_limit, passing_score, questions)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
-      RETURNING *`,
+    // Insert quiz
+    const quizResult = await client.query(
+      `INSERT INTO quizzes (title, description, category, difficulty, time_limit, passing_score, created_by, created_at) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW()) RETURNING id`,
       [
         title,
         description,
-        category || "general",
-        difficulty || "medium",
-        timeLimit || 60,
-        passingScore || 60,
-        JSON.stringify(processedQuestions),
+        category,
+        difficulty,
+        timeLimit,
+        passingScore,
+        req.user.userId,
       ]
     );
 
-    res.json({ success: true, quiz: result.rows[0] });
+    const quizId = quizResult.rows[0].id;
+
+    // Insert questions with rich content
+    for (let i = 0; i < questions.length; i++) {
+      const question = questions[i];
+
+      const questionResult = await client.query(
+        `INSERT INTO questions (quiz_id, question_text, question_html, question_type, points, time_limit, explanation, explanation_html, question_order, created_at) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW()) RETURNING id`,
+        [
+          quizId,
+          question.text || "",
+          question.html || question.text || "",
+          question.type || "single",
+          question.points || 1,
+          question.timeLimit || 60,
+          question.explanation || "",
+          question.explanationHtml || question.explanation || "",
+          i + 1,
+        ]
+      );
+
+      const questionId = questionResult.rows[0].id;
+
+      // Insert answers with HTML support
+      if (question.answers && Array.isArray(question.answers)) {
+        for (let j = 0; j < question.answers.length; j++) {
+          const answer = question.answers[j];
+          const isCorrect = Array.isArray(question.correct)
+            ? question.correct.includes(j)
+            : question.correct === j;
+
+          await client.query(
+            `INSERT INTO answers (question_id, answer_text, answer_html, is_correct, answer_order, created_at) 
+             VALUES ($1, $2, $3, $4, $5, NOW())`,
+            [
+              questionId,
+              typeof answer === "string" ? answer : answer.text || "",
+              typeof answer === "string"
+                ? answer
+                : answer.html || answer.text || "",
+              isCorrect,
+              j + 1,
+            ]
+          );
+        }
+      }
+
+      // Handle special question metadata
+      if (question.metadata) {
+        for (const [key, value] of Object.entries(question.metadata)) {
+          await client.query(
+            `INSERT INTO question_metadata (question_id, metadata_key, metadata_value) 
+             VALUES ($1, $2, $3)`,
+            [questionId, key, JSON.stringify(value)]
+          );
+        }
+      }
+    }
+
+    await client.query("COMMIT");
+
+    res.json({
+      success: true,
+      message: "Quiz created successfully",
+      quizId: quizId,
+    });
   } catch (error) {
-    console.error("Create quiz error:", error);
-    res.status(500).json({ error: "Помилка створення тесту" });
+    await client.query("ROLLBACK");
+    console.error("Error creating quiz:", error);
+    res.status(500).json({ error: "Failed to create quiz" });
+  } finally {
+    client.release();
+  }
+});
+
+app.get("/api/admin/quizzes/:id", requireAdmin, async (req, res) => {
+  try {
+    const quizId = Number.parseInt(req.params.id);
+
+    // Get quiz details
+    const quizResult = await pool.query("SELECT * FROM quizzes WHERE id = $1", [
+      quizId,
+    ]);
+
+    if (quizResult.rows.length === 0) {
+      return res.status(404).json({ error: "Quiz not found" });
+    }
+
+    const quiz = quizResult.rows[0];
+
+    // Get questions with answers
+    const questionsResult = await pool.query(
+      `SELECT q.*, 
+       json_agg(
+         json_build_object(
+           'id', a.id,
+           'text', a.answer_text,
+           'html', a.answer_html,
+           'isCorrect', a.is_correct,
+           'order', a.answer_order
+         ) ORDER BY a.answer_order
+       ) as answers
+       FROM questions q
+       LEFT JOIN answers a ON q.id = a.question_id
+       WHERE q.quiz_id = $1
+       GROUP BY q.id
+       ORDER BY q.question_order`,
+      [quizId]
+    );
+
+    // Get question metadata
+    const metadataResult = await pool.query(
+      `SELECT qm.question_id, qm.metadata_key, qm.metadata_value
+       FROM question_metadata qm
+       JOIN questions q ON qm.question_id = q.id
+       WHERE q.quiz_id = $1`,
+      [quizId]
+    );
+
+    // Organize metadata by question
+    const metadataByQuestion = {};
+    metadataResult.rows.forEach((row) => {
+      if (!metadataByQuestion[row.question_id]) {
+        metadataByQuestion[row.question_id] = {};
+      }
+      try {
+        metadataByQuestion[row.question_id][row.metadata_key] = JSON.parse(
+          row.metadata_value
+        );
+      } catch {
+        metadataByQuestion[row.question_id][row.metadata_key] =
+          row.metadata_value;
+      }
+    });
+
+    // Combine questions with metadata
+    const questions = questionsResult.rows.map((q) => ({
+      id: q.id,
+      text: q.question_text,
+      html: q.question_html,
+      type: q.question_type,
+      points: q.points,
+      timeLimit: q.time_limit,
+      explanation: q.explanation,
+      explanationHtml: q.explanation_html,
+      order: q.question_order,
+      answers: q.answers.filter((a) => a.id !== null),
+      metadata: metadataByQuestion[q.id] || {},
+    }));
+
+    res.json({
+      ...quiz,
+      questions,
+    });
+  } catch (error) {
+    console.error("Get quiz error:", error);
+    res.status(500).json({ error: "Error retrieving quiz" });
+  }
+});
+
+app.put("/api/admin/quizzes/:id", requireAdmin, async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    const quizId = Number.parseInt(req.params.id);
+    const {
+      title,
+      description,
+      category,
+      difficulty,
+      timeLimit,
+      passingScore,
+      questions,
+    } = req.body;
+
+    // Update quiz
+    await client.query(
+      `UPDATE quizzes SET 
+        title = $1,
+        description = $2,
+        category = $3,
+        difficulty = $4,
+        time_limit = $5,
+        passing_score = $6,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $7`,
+      [
+        title,
+        description,
+        category,
+        difficulty,
+        timeLimit,
+        passingScore,
+        quizId,
+      ]
+    );
+
+    // Delete existing questions and answers (cascade will handle answers)
+    await client.query("DELETE FROM questions WHERE quiz_id = $1", [quizId]);
+
+    // Insert updated questions
+    for (let i = 0; i < questions.length; i++) {
+      const question = questions[i];
+
+      const questionResult = await client.query(
+        `INSERT INTO questions (quiz_id, question_text, question_html, question_type, points, time_limit, explanation, explanation_html, question_order, created_at) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW()) RETURNING id`,
+        [
+          quizId,
+          question.text || "",
+          question.html || question.text || "",
+          question.type || "single",
+          question.points || 1,
+          question.timeLimit || 60,
+          question.explanation || "",
+          question.explanationHtml || question.explanation || "",
+          i + 1,
+        ]
+      );
+
+      const questionId = questionResult.rows[0].id;
+
+      // Insert answers
+      if (question.answers && Array.isArray(question.answers)) {
+        for (let j = 0; j < question.answers.length; j++) {
+          const answer = question.answers[j];
+          const isCorrect = Array.isArray(question.correct)
+            ? question.correct.includes(j)
+            : question.correct === j;
+
+          await client.query(
+            `INSERT INTO answers (question_id, answer_text, answer_html, is_correct, answer_order, created_at) 
+             VALUES ($1, $2, $3, $4, $5, NOW())`,
+            [
+              questionId,
+              typeof answer === "string" ? answer : answer.text || "",
+              typeof answer === "string"
+                ? answer
+                : answer.html || answer.text || "",
+              isCorrect,
+              j + 1,
+            ]
+          );
+        }
+      }
+
+      // Insert metadata
+      if (question.metadata) {
+        for (const [key, value] of Object.entries(question.metadata)) {
+          await client.query(
+            `INSERT INTO question_metadata (question_id, metadata_key, metadata_value) 
+             VALUES ($1, $2, $3)`,
+            [questionId, key, JSON.stringify(value)]
+          );
+        }
+      }
+    }
+
+    await client.query("COMMIT");
+
+    res.json({
+      success: true,
+      message: "Quiz updated successfully",
+    });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Update quiz error:", error);
+    res.status(500).json({ error: "Error updating quiz" });
+  } finally {
+    client.release();
   }
 });
 
@@ -625,69 +966,96 @@ app.post("/api/quizzes/:id/submit", authenticateToken, async (req, res) => {
     const { answers, timeSpent } = req.body;
     const userId = req.user.userId;
 
-    // Input validation
-    if (!Array.isArray(answers)) {
-      await client.query("ROLLBACK");
-      return res.status(400).json({
-        success: false,
-        error: "Невірний формат відповідей",
-      });
-    }
-
-    if (timeSpent && (typeof timeSpent !== "number" || timeSpent < 0)) {
-      await client.query("ROLLBACK");
-      return res.status(400).json({
-        success: false,
-        error: "Невірний формат часу виконання",
-      });
-    }
-
-    // Get quiz data
-    const quizResult = await client.query(
-      "SELECT * FROM quizzes WHERE id = $1",
-      [quizId]
-    );
+    // Get quiz with questions and correct answers
+    const quizResult = await pool.query("SELECT * FROM quizzes WHERE id = $1", [
+      quizId,
+    ]);
     if (quizResult.rows.length === 0) {
       await client.query("ROLLBACK");
-      return res.status(404).json({
-        success: false,
-        error: "Тест не знайдено",
-      });
+      return res.status(404).json({ success: false, error: "Quiz not found" });
     }
 
     const quiz = quizResult.rows[0];
-    const questions = quiz.questions;
 
-    // Validate answers array length
+    // Get questions with correct answers
+    const questionsResult = await pool.query(
+      `SELECT q.id, q.question_type, q.points,
+       json_agg(
+         json_build_object(
+           'id', a.id,
+           'isCorrect', a.is_correct,
+           'order', a.answer_order
+         ) ORDER BY a.answer_order
+       ) as answers
+       FROM questions q
+       LEFT JOIN answers a ON q.id = a.question_id
+       WHERE q.quiz_id = $1
+       GROUP BY q.id, q.question_type, q.points
+       ORDER BY q.question_order`,
+      [quizId]
+    );
+
+    const questions = questionsResult.rows;
+
     if (answers.length !== questions.length) {
       await client.query("ROLLBACK");
       return res.status(400).json({
         success: false,
-        error: "Кількість відповідей не відповідає кількості питань",
+        error: "Answer count doesn't match question count",
       });
     }
 
-    // Calculate score
     let correctAnswers = 0;
-    const totalQuestions = questions.length;
+    let totalPoints = 0;
+    let earnedPoints = 0;
 
     questions.forEach((question, index) => {
       const userAnswer = answers[index];
-      if (userAnswer !== null && userAnswer === question.correct) {
+      const questionAnswers = question.answers.filter((a) => a.id !== null);
+      const correctAnswerIndices = questionAnswers
+        .filter((a) => a.isCorrect)
+        .map((a) => a.order - 1);
+
+      totalPoints += question.points;
+
+      let isCorrect = false;
+
+      switch (question.question_type) {
+        case "single":
+          isCorrect =
+            userAnswer !== null && correctAnswerIndices.includes(userAnswer);
+          break;
+        case "multiple":
+          if (Array.isArray(userAnswer)) {
+            isCorrect =
+              userAnswer.length === correctAnswerIndices.length &&
+              userAnswer.every((ans) => correctAnswerIndices.includes(ans));
+          }
+          break;
+        default:
+          isCorrect =
+            userAnswer !== null && correctAnswerIndices.includes(userAnswer);
+      }
+
+      if (isCorrect) {
         correctAnswers++;
+        earnedPoints += question.points;
       }
     });
 
-    const score = Math.round((correctAnswers / totalQuestions) * 100);
+    const score =
+      totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0;
 
-    // Save result to database
+    // Save result
     const resultData = {
       userAnswers: answers,
       questions: questions,
       correctAnswers: correctAnswers,
-      totalQuestions: totalQuestions,
+      totalQuestions: questions.length,
       score: score,
       timeSpent: timeSpent || 0,
+      earnedPoints,
+      totalPoints,
     };
 
     const insertResult = await client.query(
@@ -698,7 +1066,7 @@ app.post("/api/quizzes/:id/submit", authenticateToken, async (req, res) => {
         quizId,
         score,
         correctAnswers,
-        totalQuestions,
+        questions.length,
         timeSpent || 0,
         JSON.stringify(resultData),
         quiz.category,
@@ -708,15 +1076,7 @@ app.post("/api/quizzes/:id/submit", authenticateToken, async (req, res) => {
       ]
     );
 
-    if (insertResult.rows.length === 0) {
-      await client.query("ROLLBACK");
-      return res.status(500).json({
-        success: false,
-        error: "Помилка збереження результату тесту",
-      });
-    }
-
-    // Update user statistics with correct calculation
+    // Update user statistics
     const userUpdateResult = await client.query(
       `UPDATE users SET 
        tests_completed = tests_completed + 1,
@@ -725,42 +1085,27 @@ app.post("/api/quizzes/:id/submit", authenticateToken, async (req, res) => {
       [score, userId]
     );
 
-    if (userUpdateResult.rows.length === 0) {
-      await client.query("ROLLBACK");
-      return res.status(500).json({
-        success: false,
-        error: "Помилка оновлення статистики користувача",
-      });
+    if (userUpdateResult.rows.length > 0) {
+      const { tests_completed, total_score } = userUpdateResult.rows[0];
+      const newAverageScore =
+        Math.round((total_score / tests_completed) * 100) / 100;
+
+      await client.query(`UPDATE users SET average_score = $1 WHERE id = $2`, [
+        newAverageScore,
+        userId,
+      ]);
     }
 
-    // Calculate and update average score separately
-    const { tests_completed, total_score } = userUpdateResult.rows[0];
-    const newAverageScore =
-      Math.round((total_score / tests_completed) * 100) / 100;
-
-    await client.query(`UPDATE users SET average_score = $1 WHERE id = $2`, [
-      newAverageScore,
-      userId,
-    ]);
-
     // Update quiz statistics
-    const quizUpdateResult = await client.query(
+    await client.query(
       `UPDATE quizzes SET 
        times_taken = times_taken + 1,
        average_score = (
          SELECT ROUND(AVG(score)::numeric, 2) FROM test_results WHERE quiz_id = $1
        )
-       WHERE id = $1 RETURNING times_taken`,
+       WHERE id = $1`,
       [quizId]
     );
-
-    if (quizUpdateResult.rows.length === 0) {
-      await client.query("ROLLBACK");
-      return res.status(500).json({
-        success: false,
-        error: "Помилка оновлення статистики тесту",
-      });
-    }
 
     await client.query("COMMIT");
 
@@ -769,7 +1114,9 @@ app.post("/api/quizzes/:id/submit", authenticateToken, async (req, res) => {
       result: {
         score: score,
         correctAnswers: correctAnswers,
-        totalQuestions: totalQuestions,
+        totalQuestions: questions.length,
+        earnedPoints,
+        totalPoints,
         timeSpent: timeSpent || 0,
         resultId: insertResult.rows[0].id,
       },
@@ -777,23 +1124,9 @@ app.post("/api/quizzes/:id/submit", authenticateToken, async (req, res) => {
   } catch (error) {
     await client.query("ROLLBACK");
     console.error("Submit quiz error:", error);
-
-    // Provide more specific error messages
-    let errorMessage = "Помилка збереження результатів";
-
-    if (error.code === "23503") {
-      errorMessage = "Помилка: користувач або тест не існує";
-    } else if (error.code === "23505") {
-      errorMessage = "Помилка: дублікат запису";
-    } else if (error.code === "22P02") {
-      errorMessage = "Помилка: невірний формат даних";
-    } else if (error.message.includes("connection")) {
-      errorMessage = "Помилка з'єднання з базою даних";
-    }
-
     res.status(500).json({
       success: false,
-      error: errorMessage,
+      error: "Error saving results",
     });
   } finally {
     client.release();
@@ -928,7 +1261,7 @@ app.get("/api/leaderboard", async (req, res) => {
       LIMIT 50
     `);
 
-    console.log(`[v0] Leaderboard query returned ${result.rows.length} users`);
+    console.log(` Leaderboard query returned ${result.rows.length} users`);
 
     const leaderboard = result.rows.map((row, index) => {
       const user = {
@@ -946,7 +1279,7 @@ app.get("/api/leaderboard", async (req, res) => {
       };
 
       console.log(
-        `[v0] User ${user.rank}: ${user.name} (${user.email}) - ${user.testsCompleted} tests, ${user.averageScore}% avg`
+        ` User ${user.rank}: ${user.name} (${user.email}) - ${user.testsCompleted} tests, ${user.averageScore}% avg`
       );
       return user;
     });
@@ -1236,7 +1569,7 @@ app.get("/api/admin/dashboard", requireAdmin, async (req, res) => {
 // Admin Users Endpoint
 app.get("/api/admin/users", requireAdmin, async (req, res) => {
   try {
-    console.log("[v0] Admin users endpoint called");
+    console.log(" Admin users endpoint called");
 
     const result = await pool.query(`
       SELECT 
@@ -1276,10 +1609,10 @@ app.get("/api/admin/users", requireAdmin, async (req, res) => {
       createdAt: user.created_at,
     }));
 
-    console.log("[v0] Returning users:", users.length);
+    console.log("Returning users:", users.length);
     res.json({ users });
   } catch (error) {
-    console.error("[v0] Get admin users error:", error);
+    console.error(" Get admin users error:", error);
     res.status(500).json({ error: "Помилка отримання користувачів" });
   }
 });
@@ -1522,7 +1855,7 @@ app.get("/api/admin/analytics", requireAdmin, async (req, res) => {
 // Get all users with detailed information (admin only)
 app.get("/api/admin/users", requireAdmin, async (req, res) => {
   try {
-    console.log("[v0] Admin users endpoint called");
+    console.log(" Admin users endpoint called");
 
     const result = await pool.query(`
       SELECT u.id, u.email, u.first_name, u.last_name, u.role, u.school, u.grade, u.city, u.total_score, u.created_at,
@@ -1552,10 +1885,10 @@ app.get("/api/admin/users", requireAdmin, async (req, res) => {
       createdAt: user.created_at,
     }));
 
-    console.log("[v0] Returning users:", users.length);
+    console.log(" Returning users:", users.length);
     res.json({ users });
   } catch (error) {
-    console.error("[v0] Get admin users error:", error);
+    console.error("Get admin users error:", error);
     res.status(500).json({ error: "Помилка отримання користувачів" });
   }
 });
@@ -1669,8 +2002,7 @@ app.get("/api/admin/quiz-performance", requireAdmin, async (req, res) => {
       await pool.query(`SELECT q.id, q.title, q.category, q.difficulty,
              COUNT(tr.id) as times_completed,
              COALESCE(AVG(tr.score), 0) as average_score,
-             COALESCE(MIN(tr.score), 0) as min_score,
-             COALESCE(MAX(tr.score), 0) as max_score,
+             COALESCE(MIN(tr.score), 0) as max_score,
              jsonb_array_length(q.questions) as question_count
       FROM quizzes q
       LEFT JOIN test_results tr ON q.id = tr.quiz_id
